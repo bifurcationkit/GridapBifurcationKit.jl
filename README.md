@@ -2,7 +2,7 @@
 
 | **Documentation**                                                               | **Build Status**                                                                                |
 |:-------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
-| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://rveltz.github.io/BifurcationKit.jl/dev/tutorials/) | ![Build Status](https://travis-ci.com/rveltz/GridapBifurcationKit.jl.svg?branch=master) [![Coverage Status](https://coveralls.io/repos/github/rveltz/GridapBifurcationKit.jl/badge.svg?branch=master)](https://coveralls.io/github/rveltz/GridapBifurcationKit.jl?branch=master) |
+| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://rveltz.github.io/BifurcationKit.jl/dev/mittelmannGridap/#d-Bratu–Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)-1) |  |
 
 
 This Julia package aims at performing **automatic bifurcation analysis** of PDE solved using the Finite Elements Method (FEM) with the Julia package [Gridap.jl](https://github.com/gridap/Gridap.jl).
@@ -52,4 +52,4 @@ add https://github.com/rveltz/GridapBifurcationKit.jl
 
 ## Main features
 
-Most [features](https://github.com/rveltz/BifurcationKit.jl#main-features) of [BifurcationKit](https://github.com/rveltz/BifurcationKit.jl) are ported, please see the `examples` folder or the [tutorials](https://rveltz.github.io/BifurcationKit.jl/dev/tutorials/) for example of use.
+Most [features](https://github.com/rveltz/BifurcationKit.jl#main-features) of [BifurcationKit](https://github.com/rveltz/BifurcationKit.jl) are ported, please see the `examples` folder or the [tutorials](https://rveltz.github.io/BifurcationKit.jl/dev/mittelmannGridap/#d-Bratu–Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)-1) for example of use.
