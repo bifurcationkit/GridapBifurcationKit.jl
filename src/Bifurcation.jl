@@ -3,9 +3,9 @@ import BifurcationKit: newton, continuation, computeNormalForm
 # regular newton method
 function newton(prob::GridapProblem, x0, par, options::NewtonPar; kwargs...)
 	BK.newton(
-		(u,p) -> prob(Val(:Res), u, p),
+		(u, p) -> prob(Val(:Res), u, p),
 		(u, p) -> prob(Val(:Jac), u, p),
-		x0.free_values, par, options; kwargs...)
+		get_free_values(x0), par, options; kwargs...)
 end
 
 # simple continuation
@@ -13,7 +13,7 @@ function continuation(prob::GridapProblem, x0, par, lens::Lens, contParams::Cont
 	BK.continuation(
 	(u, p) -> prob(Val(:Res), u, p),
 	(u, p) -> prob(Val(:Jac), u, p),
-	x0.free_values, par, lens, contParams;kwargs...)
+	get_free_values(x0), par, lens, contParams;kwargs...)
 end
 
 # normal form computation
@@ -45,7 +45,7 @@ function bifurcationdiagram(prob::GridapProblem, x0, par0, lens::Lens, level::In
 		(u, p) -> prob(Val(:Jac), u, p),
 		(u, p, dx1, dx2) -> prob(u, p, dx1, dx2),
 		(u, p, dx1, dx2, dx3) -> prob(u, p, dx1, dx2, dx3),
-		x0.free_values,  par0, lens, level, options; usedeflation = usedeflation, kwargs...)
+		get_free_values(x0), par0, lens, level, options; usedeflation = usedeflation, kwargs...)
 end
 
 function bifurcationdiagram(prob::GridapProblem, br::BK.BranchResult, level::Int, options; usedeflation = false, kwargs...)
