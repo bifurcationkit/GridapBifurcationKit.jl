@@ -1,35 +1,39 @@
 using Revise
-using Plots, Gridap,Setfield
+using Plots
+using Gridap,Setfield
 using Gridap.FESpaces
 using GridapBifurcationKit, BifurcationKit
 plotgridap!(x; k...) = (n=Int(sqrt(length(x)));heatmap!(reshape(x,n,n); color=:viridis, k...))
 plotgridap(x; k...) =( plot();plotgridap!(x; k...))
 norminf = x -> norm(x, Inf)
 #############################################
-@law NL(u) = exp(u)
-res(u,p,v) =    -∇(v)⋅∇(u)      -  v ⋅ (u - p.λ * NL(u)) * 10
-jac(u,p,du,v) = -∇(v)⋅∇(du) - v ⋅ du ⋅ (1 - p.λ * NL(u)) * 10
-d2res(u,p,du1,du2,v) =            v ⋅ du1 ⋅ du2 ⋅ NL(u) * 10 * p.λ
-d3res(u,p,du1,du2,du3,v) =  v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ NL(u) * 10 * p.λ
-
+# discretisation
 n = 40
 domain = (0,1,0,1)
 cells = (n,n)
 model = CartesianDiscreteModel(domain,cells)
 
+# function spaces
 order = 1
-V = TestFESpace(
-	model=model,reffe=:Lagrangian,valuetype=Float64,
-	order=order,conformity=:H1,)#dirichlet_tags="boundary")
+reffe = ReferenceFE(lagrangian,Float64,order)
+V = TestFESpace(model,reffe,conformity=:H1,)#dirichlet_tags="boundary")
 U = TrialFESpace(V)
 
-trian = Triangulation(model)
+Ω = Triangulation(model)
 degree = 2*order
-quad = CellQuadrature(trian,degree)
+dΩ = Measure(Ω,degree)
+
+
+NL(u) = exp(u)
+res(u,p,v) = ∫( -∇(v)⋅∇(u) -  v ⋅ (u - p.λ ⋅ (NL ∘ u)) * 10 )*dΩ
+jac(u,p,du,v) = ∫( -∇(v)⋅∇(du) - v ⋅ du ⋅ (1 - p.λ *( NL ∘ u)) * 10 )*dΩ
+d2res(u,p,du1,du2,v) = ∫( v ⋅ du1 ⋅ du2 ⋅ (NL ∘ u) * 10 * p.λ )*dΩ
+d3res(u,p,du1,du2,du3,v) = ∫( v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ (NL ∘ u) * 10 * p.λ )*dΩ
 
 uh = zero(U)
 par_bratu=(λ = 0.01,)
-prob = GridapProblem(res, jac, d2res, d3res, trian, quad, V, U)
+# prob = GridapProblem(res, jac, d2res, d3res, V, U)
+prob = GridapProblem(res, V, U)
 
 optn = NewtonPar(eigsolver = EigArpack())#EigKrylovKit(dim = 100))
 sol, = newton(prob, uh, par_bratu, NewtonPar(optn; verbose = true))
@@ -64,7 +68,7 @@ br1, = continuation(prob, br, 3,
 		plotSolution = (x, p; k...) -> plotgridap!(x;  k...),
 		)
 
-plot([br,br1])
+plot(br,br1)
 
 br2, = continuation(prob, br1, 3,
 		setproperties(opts;ds = 0.005, dsmax = 0.05, maxSteps = 140, detectBifurcation = 0);
@@ -77,7 +81,7 @@ br2, = continuation(prob, br1, 3,
 		plotSolution = (x, p; k...) -> plotgridap!(x;  k...),
 		)
 
-plot([br,br1,br2], legend=false)
+plot(br,br1,br2, legend=false)
 
 br3, = continuation(prob, br, 2,
 		setproperties(opts;ds = 0.005, dsmax = 0.05, maxSteps = 140, detectBifurcation = 3);
@@ -90,7 +94,7 @@ br3, = continuation(prob, br, 2,
 		plotSolution = (x, p; k...) -> plotgridap!(x;  k...),
 		)
 
-plot([br,br1,br2,br3...], legend=false)
+plot(br,br1,br2,br3..., legend=false)
 plot(br3)
 ####################################################################################################
 function optionsCont(x,p,l; opt = opts)

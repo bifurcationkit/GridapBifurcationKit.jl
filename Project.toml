@@ -9,4 +9,5 @@ Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 
 [compat]
-Gridap = "0.14"
+Gridap = "0.14, 0.15"
+Setfield = "0.5.0, 0.7.0, 0.8.0"
