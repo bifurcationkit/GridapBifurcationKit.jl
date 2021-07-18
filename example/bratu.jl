@@ -32,8 +32,8 @@ d3res(u,p,du1,du2,du3,v) = ∫( v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ (NL ∘ u) * 10 * 
 
 uh = zero(U)
 par_bratu=(λ = 0.01,)
-# prob = GridapProblem(res, jac, d2res, d3res, V, U)
-prob = GridapProblem(res, V, U)
+prob = GridapProblem(res, jac, d2res, d3res, V, U)
+# prob = GridapProblem(res, V, U)
 
 optn = NewtonPar(eigsolver = EigArpack())#EigKrylovKit(dim = 100))
 sol, = newton(prob, uh, par_bratu, NewtonPar(optn; verbose = true))
@@ -55,7 +55,7 @@ br, = continuation(prob, uh, par_bratu, (@lens _.λ), opts;
 
 plot(br)
 
-nf = computeNormalForm(prob, br, 3; verbose = true, nev = 50)
+nf = computeNormalForm(prob, br, 5; verbose = true, scaleζ = norminf)
 ####################################################################################################
 br1, = continuation(prob, br, 3,
 		setproperties(opts;ds = 0.005, dsmax = 0.05, maxSteps = 140, detectBifurcation = 3);
@@ -83,14 +83,17 @@ br2, = continuation(prob, br1, 3,
 
 plot(br,br1,br2, legend=false)
 
-br3, = continuation(prob, br, 2,
+br3, sols = continuation(prob, br, 5,
 		setproperties(opts;ds = 0.005, dsmax = 0.05, maxSteps = 140, detectBifurcation = 3);
-		verbosity = 0, plot = true, nev = 10,
+		verbosity = 0, plot = true,
+		δp = 0.005,
 		# printSolution = (x, p) -> normbratu(x),
 		# finaliseSolution = finSol,
 		# tangentAlgo = BorderedPred(),
 		usedeflation = true,
-		# callbackN = cb,
+		# verbosedeflation = true,
+		scaleζ = norminf,
+		callbackN = cb,
 		plotSolution = (x, p; k...) -> plotgridap!(x;  k...),
 		)
 
@@ -115,15 +118,15 @@ function cb(x,f,J,res,it,itl,optN; kwargs...)
 		_x = get(kwargs, :z0, nothing)
 		cdt = (norm(_x.u - x) < 1020.5 && abs(_x.p - kwargs[:p]) < 0.05)
 		~cdt && @warn "Jump callback"
-		return cdt
+		return cdt && res < 1e2
 	end
-	true
+	return res < 1e2
 end
 
-function finSol(z, tau, step, br)
-	if ~isnothing(br.bifpoint)
-		if br.bifpoint[end].step == step
-			BifurcationKit._show(stdout, br.bifpoint[end], step)
+function finSol(z, tau, step, br; k...)
+	if ~isnothing(br.specialpoint)
+		if ~isempty(br.specialpoint) && br.specialpoint[end].step == step
+			BifurcationKit._show(stdout, br.specialpoint[end], step)
 		end
 	end
 	return true
@@ -139,7 +142,7 @@ diagram = GridapBifurcationKit.bifurcationdiagram(prob,
 		usedeflation = true,
 		finaliseSolution = finSol,
 		plotSolution = (x, p; k...) -> plotgridap!(x;  k...),
-		# normC = norminf
+		normC = norminf
 		)
 
 code = (2,)
