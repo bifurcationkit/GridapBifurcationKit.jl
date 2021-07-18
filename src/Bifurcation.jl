@@ -5,19 +5,19 @@ function newton(prob::GridapProblem, x0, par, options::NewtonPar; kwargs...)
 	BK.newton(
 		(u, p) -> prob(Val(:Res), u, p),
 		(u, p) -> prob(Val(:Jac), u, p),
-		get_free_values(x0), par, options; kwargs...)
+		get_free_dof_values(x0), par, options; kwargs...)
 end
 
 # simple continuation
-function continuation(prob::GridapProblem, x0, par, lens::Lens, contParams::ContinuationPar; kwargs...)
+function continuation(prob::GridapProblem, x0, par, lens::Lens, contParams::ContinuationPar; linearAlgo = nothing, kwargs...)
 	BK.continuation(
 	(u, p) -> prob(Val(:Res), u, p),
 	(u, p) -> prob(Val(:Jac), u, p),
-	get_free_values(x0), par, lens, contParams;kwargs...)
+	get_free_dof_values(x0), par, lens, contParams; kwargs...)
 end
 
 # normal form computation
-function computeNormalForm(prob::GridapProblem, br::BK.BranchResult, ind_bif::Int; kwargs...)
+function computeNormalForm(prob::GridapProblem, br::BK.AbstractBranchResult, ind_bif::Int; kwargs...)
 	BK.computeNormalForm(
 		(u, p) -> prob(Val(:Res), u, p),
 		(u, p) -> prob(Val(:Jac), u, p),
@@ -28,7 +28,7 @@ function computeNormalForm(prob::GridapProblem, br::BK.BranchResult, ind_bif::In
 end
 
 # automatic branch switching
-function continuation(prob::GridapProblem, br::BK.BranchResult, ind_bif::Int, contParams::ContinuationPar; kwargs...)
+function continuation(prob::GridapProblem, br::BK.AbstractBranchResult, ind_bif::Int, contParams::ContinuationPar; kwargs...)
 	BK.continuation(
 		(u, p) -> prob(Val(:Res), u, p),
 		(u, p) -> prob(Val(:Jac), u, p),
@@ -45,10 +45,10 @@ function bifurcationdiagram(prob::GridapProblem, x0, par0, lens::Lens, level::In
 		(u, p) -> prob(Val(:Jac), u, p),
 		(u, p, dx1, dx2) -> prob(u, p, dx1, dx2),
 		(u, p, dx1, dx2, dx3) -> prob(u, p, dx1, dx2, dx3),
-		get_free_values(x0), par0, lens, level, options; usedeflation = usedeflation, kwargs...)
+		get_free_dof_values(x0), par0, lens, level, options; usedeflation = usedeflation, kwargs...)
 end
 
-function bifurcationdiagram(prob::GridapProblem, br::BK.BranchResult, level::Int, options; usedeflation = false, kwargs...)
+function bifurcationdiagram(prob::GridapProblem, br::BK.AbstractBranchResult, level::Int, options; usedeflation = false, kwargs...)
 	BK.bifurcationdiagram(
 		(u, p) -> prob(Val(:Res), u, p),
 		(u, p) -> prob(Val(:Jac), u, p),

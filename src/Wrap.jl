@@ -11,7 +11,7 @@ end
 
 # constructors
 """
-	GridapProblem(res, jac, trian, quad, V, U; autodiff = false, linsolver = nothing)
+	GridapProblem(res, jac, V, U; autodiff = false, linsolver = nothing)
 
 Construct a `GridapProblem` which encodes the PDE using Gridap.
 
@@ -35,7 +35,7 @@ This formulation allows to pass the second and third derivatives of the residual
 
 """
 function GridapProblem(res, jac, V, U; autodiff = false, linsolver = nothing)
-	return GridapProblem(res, autodiff ? nothing : jac, V, U, linsolver)
+	return GridapProblem(res, autodiff ? nothing : jac, nothing, nothing, V, U, linsolver)
 end
 
 function GridapProblem(res, V, U; autodiff = false, linsolver = nothing)
