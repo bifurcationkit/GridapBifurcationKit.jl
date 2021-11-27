@@ -1,5 +1,4 @@
-using Revise
-using Plots
+using Revise, Plots
 using Gridap,Setfield
 using Gridap.FESpaces
 using GridapBifurcationKit, BifurcationKit

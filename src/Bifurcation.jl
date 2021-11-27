@@ -38,6 +38,14 @@ function continuation(prob::GridapProblem, br::BK.AbstractBranchResult, ind_bif:
 	)
 end
 
+# deflated continuation
+function continuation(prob::GridapProblem, par, lens::Lens, contParams::ContinuationPar, defOp::DeflationOperator; linearAlgo = nothing, kwargs...)
+	BK.continuation(
+	(u, p) -> prob(Val(:Res), u, p),
+	(u, p) -> prob(Val(:Jac), u, p),
+	par, lens, contParams, defOp; kwargs...)
+end
+
 # automatic bifurcation diagram
 function bifurcationdiagram(prob::GridapProblem, x0, par0, lens::Lens, level::Int, options; usedeflation = false, kwargs...)
 	BK.bifurcationdiagram(

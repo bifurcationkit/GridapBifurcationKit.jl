@@ -1,5 +1,5 @@
 # structure to help casting the functional in a way BifurcationKit can use
-struct GridapProblem{Tres,Tjac,Td2res,Td3res,TV,TU, Tls}
+struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls}
 	res::Tres		# res(u, p, v), 				residual
 	jac::Tjac		# jac(u, p, du, v), 			jacobian
 	d2res::Td2res	# d2res(u, du1, du2, v)
