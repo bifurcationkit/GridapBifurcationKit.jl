@@ -46,7 +46,7 @@ This Julia package aims at performing **automatic bifurcation analysis** of PDE 
 To install this package, run the command
 
 ```julia
-add https://github.com/rveltz/GridapBifurcationKit.jl
+add https://github.com/bifurcationkit/GridapBifurcationKit.jl
 ```
 
 
