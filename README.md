@@ -2,7 +2,7 @@
 
 | **Documentation**                                                               | **Build Status**                                                                                |
 |:-------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
-| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://rveltz.github.io/BifurcationKit.jl/dev/mittelmannGridap/#d-Bratu–Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)-1) |  |
+| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://bifurcationkit.github.io/BifurcationKitDocs.jl/dev/tutorials/mittelmannGridap/#d-Bratu%E2%80%93Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)) |  |
 
 
 This Julia package aims at performing **automatic bifurcation analysis** of PDE solved using the Finite Elements Method (FEM) with the Julia package [Gridap.jl](https://github.com/gridap/Gridap.jl).
