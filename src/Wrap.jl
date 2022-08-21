@@ -1,4 +1,3 @@
-# structure to help casting the functional in a way BifurcationKit can use
 struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls}
 	res::Tres		# res(u, p, v), 				residual
 	jac::Tjac		# jac(u, p, du, v), 			jacobian
@@ -9,11 +8,32 @@ struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls}
 	ls::Tls
 end
 
+
+# structure to help casting the functional in a way BifurcationKit can use
+struct GridapBifProblem{Tfe, Tu, Tp, Tl <: Lens, Tplot, Trec, Tδ} <: BK.AbstractBifurcationProblem
+	"gridap problem"
+	probFE::Tfe
+	"Initial guess"
+	u0::Tu
+	"parameters"
+	params::Tp
+	"Typically a `Setfield.Lens`. It specifies which parameter axis among `params` is used for continuation. For example, if `par = (α = 1.0, β = 1)`, we can perform continuation w.r.t. `α` by using `lens = (@lens _.α)`. If you have an array `par = [ 1.0, 2.0]` and want to perform continuation w.r.t. the first variable, you can use `lens = (@lens _[1])`. For more information, we refer to `SetField.jl`."
+	lens::Tl
+	"user function to plot solutions during continuation. Signature: `plotSolution(x, p; kwargs...)`"
+	plotSolution::Tplot
+	"`recordFromSolution = (x, p) -> norm(x)` function used record a few indicators about the solution. It could be `norm` or `(x, p) -> x[1]`. This is also useful when saving several huge vectors is not possible for memory reasons (for example on GPU...). This function can return pretty much everything but you should keep it small. For example, you can do `(x, p) -> (x1 = x[1], x2 = x[2], nrm = norm(x))` or simply `(x, p) -> (sum(x), 1)`. This will be stored in `contres.branch` (see below). Finally, the first component is used to plot in the continuation curve."
+	recordFromSolution::Trec
+	"used internally to compute derivatives (with finite differences) w.r.t the parameter `p`."
+	δ::Tδ
+end
+getVectorType(::GridapProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ}) where {Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ} = Tu
+
+
 # constructors
 """
-	GridapProblem(res, jac, V, U; autodiff = false, linsolver = nothing)
+	GridapBifProblem(res, jac, V, U; autodiff = false, linsolver = nothing)
 
-Construct a `GridapProblem` which encodes the PDE using Gridap.
+Construct a `GridapBifProblem` which encodes the PDE using Gridap.
 
 # Arguments
 - `res`: method which computes the residual, `res(u,p,v)` where `p` are parameters passed to the problem.
@@ -21,31 +41,30 @@ Construct a `GridapProblem` which encodes the PDE using Gridap.
 - `V`: TestFESpace
 - `U`: TrialFESpace
 
-# Simplified call
-
-`GridapProblem(res, V, U; autodiff = false, linsolver = nothing)`
-
-By not specifying the jacobian, automatic differentiation is used.
-
-# More specific call
-
-`GridapProblem(res, jac, d2res, d3res, V, U; autodiff = false, linsolver = nothing)`
-
 This formulation allows to pass the second and third derivatives of the residual. This is required if one wants to to automatic branch switching. For example one must be able to call `d2res(u, p, du1, du2, v)`.
-
 """
-function GridapProblem(res, jac, V, U; autodiff = false, linsolver = nothing)
-	return GridapProblem(res, autodiff ? nothing : jac, nothing, nothing, V, U, linsolver)
+function GridapBifProblem(res, u0, parms, V, U, lens = (@lens _);
+				autodiff = false,
+				jac = nothing,
+				d2res = nothing,
+				d3res = nothing,
+				δ = 1e-8,
+				recordFromSolution = BK.recordSolDefault,
+				plotSolution = BK.plotDefault)
+	jacFE =  autodiff ? nothing : jac
+	probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing)
+	return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plotSolution, recordFromSolution, δ)
 end
 
-function GridapProblem(res, V, U; autodiff = false, linsolver = nothing)
-	return GridapProblem(res, nothing, nothing, nothing, V, U, linsolver)
-end
-
-function GridapProblem(res, jac, d2F, d3F, V, U; autodiff = false, linsolver = nothing)
-	return GridapProblem(res, jac, d2F, d3F, V, U, linsolver)
-end
+BK.residual(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Res), u, p)
+BK.jacobian(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Jac), u, p)
+BK.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
+BK.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
+BK.isSymmetric(pb::GridapBifProblem) = false
+BK.hasAdjoint(pb::GridapBifProblem) = false
+BK.getDelta(pb::GridapBifProblem) = pb.δ
 ################################################################################
+# rebuild a gridap operator for each parameter value
 function op_from_param(gp::GridapProblem, p)
 	res(u, v) = gp.res(u, p, v)
 	if isnothing(gp.jac)
@@ -69,11 +88,6 @@ function (gp::GridapProblem)(::Val{:Jac}, u, p)
 	algop = Gridap.FESpaces.get_algebraic_operator(op)
 	return Gridap.FESpaces.jacobian(algop, u)
 end
-
-# # matrix free jacobian
-# function (gp::GridapProblem)(u, p, du)
-# 	@error "WIP"
-# end
 
 # second derivative
 function (gp::GridapProblem)(u, p, du1, du2)

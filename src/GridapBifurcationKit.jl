@@ -6,7 +6,8 @@ module GridapBifurcationKit
 	include("LinearSolvers.jl")
 	include("Bifurcation.jl")
 
-	export GridapProblem
+	export GridapBifProblem, reactionDiffusion
+	export isSymmetric, residual, jacobian, d2F, d3F
 	export newton, continuation, computeNormalForm, bifurcationdiagram
 
 end # module
