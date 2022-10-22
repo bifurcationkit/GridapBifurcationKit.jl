@@ -1,3 +1,8 @@
+cd(@__DIR__)
+using Pkg
+pkg"activate ."
+
+
 using Revise, Plots
 using Gridap,Setfield
 using Gridap.FESpaces
