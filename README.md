@@ -52,4 +52,4 @@ add https://github.com/bifurcationkit/GridapBifurcationKit.jl
 
 ## Main features
 
-Most [features](https://github.com/rveltz/BifurcationKit.jl#main-features) of [BifurcationKit](https://github.com/rveltz/BifurcationKit.jl) are ported, please see the `examples` folder or the [tutorials](https://rveltz.github.io/BifurcationKit.jl/dev/mittelmannGridap/#d-Bratu–Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)-1) for example of use.
+Most [features](https://github.com/rveltz/BifurcationKit.jl#main-features) of [BifurcationKit](https://github.com/rveltz/BifurcationKit.jl) are ported, please see the `examples` folder or the [tutorials](https://bifurcationkit.github.io/BifurcationKitDocs.jl/stable/tutorials/mittelmannGridap/#d-Bratu–Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)) for example of use.

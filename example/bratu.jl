@@ -2,9 +2,8 @@ cd(@__DIR__)
 using Pkg
 pkg"activate ."
 
-
 using Revise, Plots
-using Gridap,Setfield
+using Gridap, Setfield
 using Gridap.FESpaces
 using BifurcationKit, GridapBifurcationKit
 plotgridap!(x; k...) = (n=Int(sqrt(length(x)));heatmap!(reshape(x,n,n); color=:viridis, k...))
@@ -34,7 +33,7 @@ d2res(u, p, du1, du2, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ (NL ∘ u) * 10 * p.λ )*d
 d3res(u, p, du1, du2, du3, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ (NL ∘ u) * 10 * p.λ )*dΩ
 
 uh = zero(U)
-par_bratu=(λ = 0.01,)
+par_bratu = (λ = 0.01,)
 
 # weight for normbratu
 const w = cumsum(ones(length(uh.free_values))) / length(uh.free_values)
@@ -56,12 +55,13 @@ br = continuation(prob, PALC(tangent = Bordered()), opts;
 
 plot(br)
 
-nf = getNormalForm(br, 5; verbose = true, scaleζ = norminf)
+nf = getNormalForm(br, 2; verbose = true, scaleζ = norminf)
 ####################################################################################################
 br1 = continuation(br, 3,
 		setproperties(opts; ds = 0.005, dsmax = 0.05, maxSteps = 140, detectBifurcation = 3);
 		verbosity = 3, plot = true, nev = 10,
 		usedeflation = true,
+		# scaleζ = norminf,
 		callbackN = BifurcationKit.cbMaxNorm(100),
 		)
 

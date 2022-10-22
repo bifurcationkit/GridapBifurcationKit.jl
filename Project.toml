@@ -5,10 +5,11 @@ version = "0.2.0"
 
 [deps]
 BifurcationKit = "0f109fa4-8a5d-4b75-95aa-f515264e7665"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 
 [compat]
+BifurcationKit = "0.2"
 Gridap = "0.14, 0.15, 0.16, 0.17"
 Setfield = "0.5.0, 0.7.0, 0.8.0"
-BifurcationKit = "0.2"

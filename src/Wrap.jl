@@ -8,6 +8,62 @@ struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls}
 	ls::Tls
 end
 
+# rebuild a gridap operator for each parameter value
+function op_from_param(gp::GridapProblem{Tres, Tjac}, p) where {Tres, Tjac}
+	res(u, v) = gp.res(u, p, v)
+	jac(u, du, v) = gp.jac(u, p, du, v)
+	return FEOperator(res, jac, gp.U, gp.V)
+end
+
+function op_from_param(gp::GridapProblem{Tres, Nothing}, p) where {Tres}
+	res(u, v) = gp.res(u, p, v)
+	return FEOperator(res, gp.U, gp.V)
+end
+
+# residual
+function (gp::GridapProblem)(::Val{:Res}, u, p)
+	op = op_from_param(gp, p)
+	algop = Gridap.FESpaces.get_algebraic_operator(op)
+	return Gridap.FESpaces.residual(algop, u)
+end
+
+# (sparse) jacobian matrix
+function (gp::GridapProblem)(::Val{:Jac}, u, p)
+	op = op_from_param(gp, p)
+	algop = Gridap.FESpaces.get_algebraic_operator(op)
+	return Gridap.FESpaces.jacobian(algop, u)
+end
+
+# second derivative
+function (gp::GridapProblem)(u, p, du1, du2)
+	du1h = FEFunction(gp.U, du1)
+	du2h = FEFunction(gp.U, du2)
+	a(u, v) = gp.d2res(u, p, du1h, du2h, v)
+	feop = FEOperator(a, gp.U, gp.V)
+	alop = Gridap.FESpaces.get_algebraic_operator(feop)
+	Gridap.FESpaces.residual(alop, u)
+end
+
+# third derivative
+function (gp::GridapProblem)(u, p, du1, du2, du3)
+	du1h = FEFunction(gp.U, du1)
+	du2h = FEFunction(gp.U, du2)
+	du3h = FEFunction(gp.U, du3)
+	a(u, v) = gp.d3res(u, p, du1h, du2h, du3h, v)
+	feop = FEOperator(a, gp.U, gp.V)
+	alop = Gridap.FESpaces.get_algebraic_operator(feop)
+	Gridap.FESpaces.residual(alop, u)
+end
+
+# second derivative
+function (gp::GridapProblem{Tres, Tjac, Nothing})(u, p, du1, du2) where {Tres, Tjac}
+	jvp(central_fdm(3, 1), z -> gp(Val(:Jac), z, p) * du1, (u, du2))
+end
+
+# third derivative
+function (gp::GridapProblem{Tres, Tjac, Td2res, Nothing})(u, p, du1, du2, du3) where {Tres, Tjac, Td2res}
+	jvp(central_fdm(3, 1), z -> gp(z, p, du1, du2), (u, du3))
+end
 
 # structure to help casting the functional in a way BifurcationKit can use
 struct GridapBifProblem{Tfe, Tu, Tp, Tl <: Lens, Tplot, Trec, Tδ} <: BK.AbstractBifurcationProblem
@@ -36,8 +92,8 @@ getVectorType(::GridapProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ}) where {Tfe, Tu
 Construct a `GridapBifProblem` which encodes the PDE using Gridap.
 
 # Arguments
-- `res`: method which computes the residual, `res(u,p,v)` where `p` are parameters passed to the problem.
-- `jac` method which computes the jacobian, `jac(u,p,du,v)` where `p` are parameters passed to the problem.
+- `res`: method which computes the residual, `res(u, p, v)` where `p` are parameters passed to the problem.
+- `jac` method which computes the jacobian, `jac(u, p, du, v)` where `p` are parameters passed to the problem.
 - `V`: TestFESpace
 - `U`: TrialFESpace
 
@@ -64,55 +120,3 @@ BK.isSymmetric(pb::GridapBifProblem) = false
 BK.hasAdjoint(pb::GridapBifProblem) = false
 BK.getDelta(pb::GridapBifProblem) = pb.δ
 ################################################################################
-# rebuild a gridap operator for each parameter value
-function op_from_param(gp::GridapProblem, p)
-	res(u, v) = gp.res(u, p, v)
-	if isnothing(gp.jac)
-		return FEOperator(res, gp.U, gp.V)
-	else
-		jac(u, du, v) = gp.jac(u, p, du, v)
-		return FEOperator(res, jac, gp.U, gp.V)
-	end
-end
-
-# residual
-function (gp::GridapProblem)(::Val{:Res}, u, p)
-	op = op_from_param(gp, p)
-	algop = Gridap.FESpaces.get_algebraic_operator(op)
-	return Gridap.FESpaces.residual(algop, u)
-end
-
-# (sparse) jacobian matrix
-function (gp::GridapProblem)(::Val{:Jac}, u, p)
-	op = op_from_param(gp, p)
-	algop = Gridap.FESpaces.get_algebraic_operator(op)
-	return Gridap.FESpaces.jacobian(algop, u)
-end
-
-# second derivative
-function (gp::GridapProblem)(u, p, du1, du2)
-	du1h = FEFunction(gp.U, du1)
-	du2h = FEFunction(gp.U, du2)
-	a(u,v) = gp.d2res(u, p, du1h, du2h, v)
-	feop = FEOperator(a, gp.U, gp.V)
-	alop = Gridap.FESpaces.get_algebraic_operator(feop)
-	Gridap.FESpaces.residual(alop, u)
-end
-
-# third derivative
-function (gp::GridapProblem)(u, p, du1, du2, du3)
-	du1h = FEFunction(gp.U, du1)
-	du2h = FEFunction(gp.U, du2)
-	du3h = FEFunction(gp.U, du3)
-	a(u,v) = gp.d3res(u, p, du1h, du2h, du3h, v)
-	feop = FEOperator(a, gp.U, gp.V)
-	alop = Gridap.FESpaces.get_algebraic_operator(feop)
-	Gridap.FESpaces.residual(alop, u)
-end
-
-# # user_uh_to_cell_residual
-# function (gp::GridapProblem)(::Val{:CellRes}, u, p)
-# 	op = op_from_param(gp, p)
-# 	algop = Gridap.FESpaces.get_algebraic_operator(op)
-# 	return Gridap.FESpaces.residual(algop, u)
-# end
