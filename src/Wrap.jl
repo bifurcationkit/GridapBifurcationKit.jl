@@ -72,17 +72,15 @@ end
 #     return Gridap.FESpaces.residual(algop, u)
 # end
 ################################################################################
-
-
-# structure to help casting the functional in a way BifurcationKit can use
-struct GridapBifProblem{Tfe, Tu, Tp, Tl <: Lens, Tplot, Trec, Tδ} <: BK.AbstractBifurcationProblem
+# structure to help casting the functional in a way that BifurcationKit can use
+struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ} <: BifurcationKit.AbstractBifurcationProblem
     "gridap problem"
     probFE::Tfe
     "Initial guess"
     u0::Tu
     "parameters"
     params::Tp
-    "Typically a `Setfield.Lens`. It specifies which parameter axis among `params` is used for continuation. For example, if `par = (α = 1.0, β = 1)`, we can perform continuation w.r.t. `α` by using `lens = (@lens _.α)`. If you have an array `par = [ 1.0, 2.0]` and want to perform continuation w.r.t. the first variable, you can use `lens = (@lens _[1])`. For more information, we refer to `SetField.jl`."
+    "Typically a `Accessors.PropertyLens`. It specifies which parameter axis among `params` is used for continuation. For example, if `par = (α = 1.0, β = 1)`, we can perform continuation w.r.t. `α` by using `lens = (@optic _.α)`. If you have an array `par = [ 1.0, 2.0]` and want to perform continuation w.r.t. the first variable, you can use `lens = (@optic _[1])`. For more information, we refer to `SetField.jl`."
     lens::Tl
     "user function to plot solutions during continuation. Signature: `plotSolution(x, p; kwargs...)`"
     plotSolution::Tplot
@@ -91,8 +89,16 @@ struct GridapBifProblem{Tfe, Tu, Tp, Tl <: Lens, Tplot, Trec, Tδ} <: BK.Abstrac
     "used internally to compute derivatives (with finite differences) w.r.t the parameter `p`."
     δ::Tδ
 end
-getVectorType(::GridapProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ}) where {Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ} = Tu
 
+BK._getvectortype(::GridapProblem{Tfe, Tu}) where {Tfe, Tu} = Tu
+BK.residual(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Res), u, p)
+BK.jacobian(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Jac), u, p)
+BK.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
+BK.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
+BK.is_symmetric(pb::GridapBifProblem) = false
+BK.has_adjoint(pb::GridapBifProblem) = false
+BK.getdelta(pb::GridapBifProblem) = pb.δ
+BK.save_solution(::GridapBifProblem, x, p) = x
 
 # constructors
 """
@@ -108,24 +114,15 @@ Construct a `GridapBifProblem` which encodes the PDE using Gridap.
 
 This formulation allows to pass the second and third derivatives of the residual. This is required if one wants to to automatic branch switching. For example one must be able to call `d2res(u, p, du1, du2, v)`.
 """
-function GridapBifProblem(res, u0, parms, V, U, lens = (@lens _);
+function GridapBifProblem(res, u0, parms, V, U, lens;
                 autodiff = false,
                 jac = nothing,
                 d2res = nothing,
                 d3res = nothing,
                 δ = 1e-8,
-                record_from_solution = BifurcationKit.recordSolDefault,
-                plot_solution = BifurcationKit.plot_default)
+                record_from_solution = BK.record_sol_default,
+                plot_solution = BK.plot_default,)
     jacFE =  autodiff ? nothing : jac
     probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing)
     return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plot_solution, record_from_solution, δ)
 end
-
-BK.residual(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Res), u, p)
-BK.jacobian(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Jac), u, p)
-BK.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
-BK.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
-BK.is_symmetric(pb::GridapBifProblem) = false
-BK.has_adjoint(pb::GridapBifProblem) = false
-BK.getdelta(pb::GridapBifProblem) = pb.δ
-################################################################################

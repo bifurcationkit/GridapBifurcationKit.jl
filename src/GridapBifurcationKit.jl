@@ -1,5 +1,5 @@
 module GridapBifurcationKit
-	using Gridap, BifurcationKit, Setfield
+	using Gridap, BifurcationKit
 	using FiniteDifferences
 	const BK = BifurcationKit
 
@@ -9,7 +9,7 @@ module GridapBifurcationKit
 	include("reactionDiffusion.jl")
 
 	export GridapBifProblem, reactionDiffusion
-	export isSymmetric, residual, jacobian, d2F, d3F
-	export newton, continuation, computeNormalForm, bifurcationdiagram
+	export residual, jacobian, d2F, d3F
+	# export newton, continuation, computeNormalForm, bifurcationdiagram
 
 end # module
