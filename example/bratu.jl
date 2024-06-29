@@ -3,9 +3,10 @@ using Pkg
 pkg"activate ."
 
 using Revise, Plots
-using Gridap, Setfield
+using Gridap
 using Gridap.FESpaces
-using BifurcationKit, GridapBifurcationKit
+using GridapBifurcationKit
+using BifurcationKit
 plotgridap!(x; k...) = (n=Int(sqrt(length(x)));heatmap!(reshape(x,n,n); color=:viridis, k...))
 plotgridap(x; k...) =( plot();plotgridap!(x; k...))
 #############################################
