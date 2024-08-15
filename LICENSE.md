@@ -1,4 +1,4 @@
-The BifurcationKit.jl Julia package is licensed under the MIT "Expat" License:
+The GridapBifurcationKit.jl Julia package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2024: Romain VELTZ.
 > 
