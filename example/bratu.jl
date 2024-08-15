@@ -49,10 +49,10 @@ prob = GridapBifProblem(res, uh, par_bratu, V, U, (@lens _.λ);
                 record_from_solution = (x, p) -> normbratu(x))
 
 # factorize leads pivots issues, better use LU factorization here
-optn = NewtonPar(eigsolver = EigArpack(), linsolver = DefaultLS(false))#EigKrylovKit(dim = 100))
+optn = NewtonPar(eigsolver = EigArpack())#EigKrylovKit(dim = 100))
 sol = newton(prob, NewtonPar(optn; verbose = true))
 
-opts = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6, dsmin_bisection = 1e-17, max_bisection_steps = 25, tol_bisection_eigenvalue = 1e-19)
+opts = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6)
 br = continuation(prob, PALC(tangent = Bordered()), opts;
     plot = true,
     verbosity = 0,
@@ -63,8 +63,8 @@ plot(br)
 nf = get_normal_form(br, 2; verbose = true, scaleζ = norminf)
 ####################################################################################################
 br1 = continuation(br, 3,
-        setproperties(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
-        verbosity = 3, plot = true, nev = 10,
+        ContinuationPar(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
+        verbosity = 0, plot = true, nev = 10,
         usedeflation = true,
         # scaleζ = norminf,
         callback_newton = BifurcationKit.cbMaxNorm(100),
@@ -73,7 +73,7 @@ br1 = continuation(br, 3,
 plot(br, br1)
 
 br2 = continuation(br1, 3,
-        setproperties(opts;ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
+        ContinuationPar(opts;ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
         verbosity = 0, plot = true, nev = 10,
         usedeflation = true,
         callback_newton = BifurcationKit.cbMaxNorm(100),
@@ -82,7 +82,7 @@ br2 = continuation(br1, 3,
 plot(br, br1, br2, legend=false)
 
 br3 = continuation(br, 2,
-        setproperties(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 0);
+        ContinuationPar(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 0);
         verbosity = 0, plot = true,
         usedeflation = true,
         verbosedeflation = false,
