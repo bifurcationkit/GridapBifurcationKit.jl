@@ -18,23 +18,11 @@ add https://github.com/bifurcationkit/GridapBifurcationKit.jl
 ```
 
 ## 📚 Support and citation
+If you use `BifurcationKit.jl` in your work, we ask that you cite the following paper on [HAL-Inria](https://hal.archives-ouvertes.fr/hal-02902346) with *bibtex* entry [CITATION.bib](https://github.com/bifurcationkit/BifurcationKit.jl/blob/master/CITATION.bib). **Open source development strongly depends on this.**
 
-**If you use this package for your work, please cite it!! Open source development strongly depends on this. It is referenced as follows:**
+You need to cite this entry **as well**
 
 ```
-@misc{veltz:hal-02902346,
-  TITLE = {{BifurcationKit.jl}},
-  AUTHOR = {Veltz, Romain},
-  URL = {https://hal.archives-ouvertes.fr/hal-02902346},
-  INSTITUTION = {{Inria Sophia-Antipolis}},
-  YEAR = {2020},
-  MONTH = Jul,
-  KEYWORDS = {pseudo-arclength-continuation ; periodic-orbits ; floquet ; gpu ; bifurcation-diagram ; deflation ; newton-krylov},
-  PDF = {https://hal.archives-ouvertes.fr/hal-02902346/file/354c9fb0d148262405609eed2cb7927818706f1f.tar.gz},
-  HAL_ID = {hal-02902346},
-  HAL_VERSION = {v1},
-}
-
 @article{Badia2020,
   doi = {10.21105/joss.02520},
   url = {https://doi.org/10.21105/joss.02520},
