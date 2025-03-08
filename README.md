@@ -9,7 +9,15 @@ This Julia package aims at performing **automatic bifurcation analysis** of PDE 
 
 > I would like to thank **Santiago Badia** and **Francesc Verdugo** for their help in developing this package.
 
+## 📦 Installation 
 
+To install this package, run the command
+
+```julia
+add https://github.com/bifurcationkit/GridapBifurcationKit.jl
+```
+
+## 📚 Support and citation
 
 **If you use this package for your work, please cite it!! Open source development strongly depends on this. It is referenced as follows:**
 
@@ -39,14 +47,6 @@ This Julia package aims at performing **automatic bifurcation analysis** of PDE 
   title = {Gridap: An extensible Finite Element toolbox in Julia},
   journal = {Journal of Open Source Software}
 }
-```
-
-## Installation 
-
-To install this package, run the command
-
-```julia
-add https://github.com/bifurcationkit/GridapBifurcationKit.jl
 ```
 
 

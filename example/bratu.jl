@@ -27,7 +27,7 @@ degree = 2*order
 dΩ = Measure(Ω, degree)
 
 NL(u) = exp(u)
-res(u, p, v) = ∫( -∇(v)⋅∇(u) -  v ⋅ (u - p.λ ⋅ (NL ∘ u)) * 10 )*dΩ
+res(u, p, v)     = ∫( -∇(v)⋅∇(u) -  v ⋅ (u - p.λ ⋅ (NL ∘ u)) * 10 )*dΩ
 jac(u, p, du, v) = ∫( -∇(v)⋅∇(du) - v ⋅ du ⋅ (1 - p.λ *( NL ∘ u)) * 10 )*dΩ
 d2res(u, p, du1, du2, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ (NL ∘ u) * 10 * p.λ )*dΩ
 d3res(u, p, du1, du2, du3, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ (NL ∘ u) * 10 * p.λ )*dΩ
@@ -41,16 +41,16 @@ w .= (1 .+ LinRange(-1,1,n+1)) * transpose(LinRange(-1,1,n+1)) |> vec
 w .-= minimum(w)
 normbratu(x) = norm(x .* w) / sqrt(length(x))
 
-prob = GridapBifProblem(res, uh, par_bratu, V, U, (@lens _.λ);
+prob = GridapBifProblem(res, uh, par_bratu, V, U, (@optic _.λ);
                 jac = jac,
                 # d2res = d2res,
                 # d3res = d3res,
                 plot_solution = (x,p; k...) -> plotgridap!(x;  k...),
-                record_from_solution = (x, p) -> normbratu(x))
+                record_from_solution = (x, p; k...) -> normbratu(x))
 
 # factorize leads pivots issues, better use LU factorization here
 optn = NewtonPar(eigsolver = EigArpack())#EigKrylovKit(dim = 100))
-sol = newton(prob, NewtonPar(optn; verbose = true))
+sol = BifurcationKit.solve(prob, Newton(), NewtonPar(optn; verbose = true))
 
 opts = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6)
 br = continuation(prob, PALC(tangent = Bordered()), opts;
