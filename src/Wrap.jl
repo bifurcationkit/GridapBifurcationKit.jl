@@ -80,7 +80,7 @@ struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ} <: BifurcationKit.Abs
     u0::Tu
     "parameters"
     params::Tp
-    "Typically a `Accessors.PropertyLens`. It specifies which parameter axis among `params` is used for continuation. For example, if `par = (α = 1.0, β = 1)`, we can perform continuation w.r.t. `α` by using `lens = (@optic _.α)`. If you have an array `par = [ 1.0, 2.0]` and want to perform continuation w.r.t. the first variable, you can use `lens = (@optic _[1])`. For more information, we refer to `SetField.jl`."
+    "Typically a `Accessors.PropertyLens`. It specifies which parameter axis among `params` is used for continuation. For example, if `par = (α = 1.0, β = 1)`, we can perform continuation w.r.t. `α` by using `lens = (@optic _.α)`. If you have an array `par = [ 1.0, 2.0]` and want to perform continuation w.r.t. the first variable, you can use `lens = (@optic _[1])`. For more information, we refer to `Accessors.jl`."
     lens::Tl
     "user function to plot solutions during continuation. Signature: `plotSolution(x, p; kwargs...)`"
     plotSolution::Tplot
@@ -93,6 +93,7 @@ end
 BK._getvectortype(::GridapProblem{Tfe, Tu}) where {Tfe, Tu} = Tu
 BK.residual(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Res), u, p)
 BK.jacobian(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Jac), u, p)
+BK.dF(pb::GridapBifProblem, u, p, dx) = BK.apply(BK.jacobian(pb, u, p), dx)
 BK.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
 BK.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
 BK.is_symmetric(pb::GridapBifProblem) = false
@@ -100,6 +101,7 @@ BK.has_adjoint(pb::GridapBifProblem) = false
 BK.getdelta(pb::GridapBifProblem) = pb.δ
 BK.save_solution(::GridapBifProblem, x, p) = x
 BK.has_adjoint_MF(::GridapBifProblem) = false # TODO improve this using AD
+BK.residual!(prob::GridapBifProblem, out, x, p) = out .= BK.residual(prob, x, p)
 
 # constructors
 """
