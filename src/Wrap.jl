@@ -101,6 +101,7 @@ BK.has_adjoint(pb::GridapBifProblem) = false
 BK.getdelta(pb::GridapBifProblem) = pb.δ
 BK.save_solution(::GridapBifProblem, x, p) = x
 BK.has_adjoint_MF(::GridapBifProblem) = false # TODO improve this using AD
+BK.update!(::GridapBifProblem, args...) = true
 BK.residual!(prob::GridapBifProblem, out, x, p) = out .= BK.residual(prob, x, p)
 
 # constructors
