@@ -1,7 +1,7 @@
 name = "GridapBifurcationKit"
 uuid = "e171ecf3-c79e-4835-a39e-60b47bc527f4"
 authors = ["Romain Veltz <romain.veltz@inria.fr>"]
-version = "0.2.1"
+version = "0.7.0"
 
 [deps]
 BifurcationKit = "0f109fa4-8a5d-4b75-95aa-f515264e7665"
@@ -9,7 +9,7 @@ FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 
 [compat]
-BifurcationKit = "^0.3.1, ^0.4.0, ^0.5"
+BifurcationKit = "^0.7"
 FiniteDifferences = "^0.12"
-Gridap = "0.14, 0.15, 0.16, 0.17, 0.18, 0.19"
+Gridap = "0.18, ^0.19, ^0.20"
 julia = "1.5"

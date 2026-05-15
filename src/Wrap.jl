@@ -90,19 +90,23 @@ struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ} <: BifurcationKit.Abs
     δ::Tδ
 end
 
-BK._getvectortype(::GridapProblem{Tfe, Tu}) where {Tfe, Tu} = Tu
-BK.residual(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Res), u, p)
-BK.jacobian(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Jac), u, p)
-BK.dF(pb::GridapBifProblem, u, p, dx) = BK.apply(BK.jacobian(pb, u, p), dx)
-BK.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
-BK.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
-BK.is_symmetric(pb::GridapBifProblem) = false
-BK.has_adjoint(pb::GridapBifProblem) = false
-BK.getdelta(pb::GridapBifProblem) = pb.δ
-BK.save_solution(::GridapBifProblem, x, p) = x
-BK.has_adjoint_MF(::GridapBifProblem) = false # TODO improve this using AD
-BK.update!(::GridapBifProblem, args...) = true
-BK.residual!(prob::GridapBifProblem, out, x, p) = out .= BK.residual(prob, x, p)
+import BifurcationKit: _getvectortype
+
+BifurcationKit._getvectortype(::GridapProblem{Tfe, Tu}) where {Tfe, Tu} = Tu
+BifurcationKit._getvectortype(pb::GridapBifProblem) = BifurcationKit._getvectortype(pb.probFE)
+BifurcationKit.isinplace(pb::GridapBifProblem) = false
+BifurcationKit.residual(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Res), u, p)
+BifurcationKit.jacobian(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Jac), u, p)
+BifurcationKit.dF(pb::GridapBifProblem, u, p, dx) = BifurcationKit.apply(BifurcationKit.jacobian(pb, u, p), dx)
+BifurcationKit.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
+BifurcationKit.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
+BifurcationKit.is_symmetric(pb::GridapBifProblem) = false
+BifurcationKit.has_adjoint(pb::GridapBifProblem) = false
+BifurcationKit.getdelta(pb::GridapBifProblem) = pb.δ
+BifurcationKit.save_solution(::GridapBifProblem, x, p) = x
+BifurcationKit.has_adjoint_MF(::GridapBifProblem) = false # TODO improve this using AD
+BifurcationKit.update!(::GridapBifProblem, args...) = true
+BifurcationKit.residual!(prob::GridapBifProblem, out, x, p) = out .= BK.residual(prob, x, p)
 
 # constructors
 """
