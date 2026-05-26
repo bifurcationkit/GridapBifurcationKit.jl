@@ -21,14 +21,14 @@ function op_from_param(gp::GridapProblem{Tres, Nothing}, p) where {Tres}
 end
 
 # residual
-function (gp::GridapProblem)(::Val{:Res}, u, p)
+function residual(gp::GridapProblem, u::AbstractArray{ <: Real}, p)
     op = op_from_param(gp, p)
     algop = Gridap.FESpaces.get_algebraic_operator(op)
     return Gridap.FESpaces.residual(algop, u)
 end
 
 # (sparse) jacobian matrix
-function (gp::GridapProblem)(::Val{:Jac}, u, p)
+function jacobian(gp::GridapProblem, u, p)
     op = op_from_param(gp, p)
     algop = Gridap.FESpaces.get_algebraic_operator(op)
     return Gridap.FESpaces.jacobian(algop, u)
@@ -57,7 +57,7 @@ end
 
 # second derivative
 function (gp::GridapProblem{Tres, Tjac, Nothing})(u, p, du1, du2) where {Tres, Tjac}
-    jvp(central_fdm(3, 1), z -> gp(Val(:Jac), z, p) * du1, (u, du2))
+    jvp(central_fdm(3, 1), z -> jacobian(gp, z, p) * du1, (u, du2))
 end
 
 # third derivative
@@ -95,8 +95,8 @@ import BifurcationKit: _getvectortype
 BifurcationKit._getvectortype(::GridapProblem{Tfe, Tu}) where {Tfe, Tu} = Tu
 BifurcationKit._getvectortype(pb::GridapBifProblem) = BifurcationKit._getvectortype(pb.probFE)
 BifurcationKit.isinplace(pb::GridapBifProblem) = false
-BifurcationKit.residual(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Res), u, p)
-BifurcationKit.jacobian(pb::GridapBifProblem, u, p) = pb.probFE(Val(:Jac), u, p)
+BifurcationKit.residual(pb::GridapBifProblem, u, p) = residual(pb.probFE, u, p)
+BifurcationKit.jacobian(pb::GridapBifProblem, u, p) = jacobian(pb.probFE, u, p)
 BifurcationKit.dF(pb::GridapBifProblem, u, p, dx) = BifurcationKit.apply(BifurcationKit.jacobian(pb, u, p), dx)
 BifurcationKit.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
 BifurcationKit.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
