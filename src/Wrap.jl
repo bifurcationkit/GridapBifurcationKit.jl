@@ -73,7 +73,7 @@ end
 # end
 ################################################################################
 # structure to help casting the functional in a way that BifurcationKit can use
-struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ} <: BifurcationKit.AbstractBifurcationProblem
+struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: BifurcationKit.AbstractBifurcationProblem
     "gridap problem"
     probFE::Tfe
     "Initial guess"
@@ -88,6 +88,8 @@ struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ} <: BifurcationKit.Abs
     recordFromSolution::Trec
     "used internally to compute derivatives (with finite differences) w.r.t the parameter `p`."
     δ::Tδ
+    "Taylor jet w.r.t. parameters."
+    jet::Tjet
 end
 
 import BifurcationKit: _getvectortype
@@ -127,10 +129,27 @@ function GridapBifProblem(res, u0, parms, V, U, lens;
                 jac = nothing,
                 d2res = nothing,
                 d3res = nothing,
-                δ = 1e-8,
                 record_from_solution = BK.record_sol_default,
-                plot_solution = BK.plot_default,)
+                plot_solution = BK.plot_default,
+                R01 = BK.FiniteDifferences(),
+                R02 = BK.FiniteDifferences(),
+                R11 = BK.FiniteDifferences(),
+                delta = BK._getprecision(Gridap.get_free_dof_values(u0)),
+                kwargs_jet...)
     jacFE =  autodiff ? nothing : jac
     probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing)
-    return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plot_solution, record_from_solution, δ)
+    # type unstable but simplifies the types a lot
+    jet = BK.Jet(;δ = delta, R01 , R02, R11, kwargs_jet...)
+    return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plot_solution, record_from_solution, delta, jet)
 end
+
+get_mass_matrix(prob::GridapBifProblem, dΩ) = get_mass_matrix(prob.probFE, dΩ)
+BK.has_hessian(prob::GridapBifProblem) = BK.has_hessian(prob.VF)
+
+BK.R01(prob::GridapBifProblem, x, p) = BK.R01(BK.has_R01_trait(prob.jet), prob, x, p)
+BK.R01(::BK.TraitUserPassed, prob::GridapBifProblem, x, p) = prob.jet.R01(x, p)
+BK.R02(prob::GridapBifProblem, x, p) = BK.R02(BK.has_R02_trait(prob.jet), prob, x, p)
+BK.R02(::BK.TraitUserPassed, prob::GridapBifProblem, x, p) = prob.jet.R02(x, p)
+
+BK.R11(prob::GridapBifProblem, x, p, dx) = BK.R11(BK.has_R11_trait(prob.jet), prob, x, p, dx)
+BK.R11(::BK.TraitUserPassed, prob::GridapBifProblem, x, p, dx) = prob.jet.R11(x, p, dx)

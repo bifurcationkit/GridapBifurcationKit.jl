@@ -60,7 +60,7 @@ br = continuation(prob, PALC(tangent = Bordered()), opts;
 
 plot(br)
 
-nf = get_normal_form(br, 2; verbose = true, scaleζ = norminf, autodiff = false)
+nf = get_normal_form(br, 2; verbose = true, scaleζ = norminf)
 ####################################################################################################
 br1 = continuation(br, 3,
         ContinuationPar(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
