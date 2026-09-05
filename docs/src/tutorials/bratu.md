@@ -12,16 +12,20 @@ $$\Delta u + NL(\lambda,u) = 0$$
 with Neumann boundary condition on $\Omega = (0,1)^2$ and where $NL(\lambda,u)\equiv-10(u-\lambda e^u)$. This is a good example to show how automatic branch switching works and also nonlinear deflation.
 
 ```@example BRATU
-using Plots
+using CairoMakie
 using Gridap
 using Gridap.FESpaces
 using GridapBifurcationKit
 using BifurcationKit
 const BK = BifurcationKit
+BK.set_plot_backend!(BK.BK_Makie())
 
 # custom plot function to deal with Gridap
-plotgridap!(x; k...) = (n=isqrt(length(x));heatmap!(reshape(x,n,n); color=:viridis, k...))
-plotgridap(x; k...) =( plot();plotgridap!(x; k...))
+function plotgridap!(ax, x; k...)
+    n = isqrt(length(x))
+    heatmap!(ax, reshape(x, n, n); colormap = :viridis, k...)
+end
+plotgridap(x; k...) = (fig = Figure(); ax = Axis(fig[1,1]); plotgridap!(ax, x; k...); fig)
 ```
 
 We are now ready to specify the problem using the setting of **Gridap.jl**: it allows to write the equations very closely to the mathematical formulation:
@@ -73,7 +77,7 @@ prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
                 jac = jac,
                 # d2res = d2res,
                 # d3res = d3res,
-                plot_solution = (x,p; k...) -> plotgridap!(x;  k...),
+                plot_solution = (ax, x, p; ax1 = nothing, k...) -> plotgridap!(ax, x; k...),
                 record_from_solution = (x, p;k...) -> normbratu(x))
 ```
 
@@ -89,7 +93,8 @@ br = continuation(prob, PALC(tangent = Bordered()), optc;
 ```
 
 ```@example BRATU
-title!("")
+f,ax = BK.plot(br)
+f
 ```
 
 
@@ -106,13 +111,13 @@ br1 = continuation(br, 3,
         scaleζ = norminf,
         callback_newton = BK.cbMaxNorm(10),
         )
-title!("")
 ```
 
 You can also plot the two branches together:
 
 ```@example BRATU
-scene = plot(br,br1,plotfold=false)
+f, ax = plot(br,br1,plotfold=false)
+f
 ```
 
 We continue our journey and compute the branch bifurcating of the first bifurcation point from the last branch we computed:
@@ -126,7 +131,8 @@ br2 = continuation(br1, 1,
         scaleζ = norminf,
         callback_newton = BK.cbMaxNorm(10),
         )
-scene = plot(br, br1, br2)
+f, ax = plot(br, br1, br2)
+f
 ```
 
 ## Automatic branch switching at the 2d-branch points
@@ -148,7 +154,8 @@ branches = continuation(br, 2,
 You can plot the branches using
 
 ```@example BRATU
-scene = plot(br1, br2, branches..., br)
+f, ax = plot(br1, br2, branches..., br)
+f
 ```
 
 ## References

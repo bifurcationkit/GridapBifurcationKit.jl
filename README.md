@@ -1,8 +1,11 @@
 # GridapBifurcationKit.jl
 
-| **Documentation**                                                               | **Build Status**                                                                                |
-|:-------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
-| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://bifurcationkit.github.io/BifurcationKitDocs.jl/dev/tutorials/mittelmannGridap/#d-Bratu%E2%80%93Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)) |  |
+| **Documentation** | **Build Status** | **Coverage** |
+|:-----------------:|:----------------:|:------------:|
+| [![docs-dev][docs-dev-img]][docs-dev-url] | [![Build Status](https://github.com/bifurcationkit/GridapBifurcationKit.jl/workflows/CI/badge.svg)](https://github.com/bifurcationkit/GridapBifurcationKit.jl/actions?query=workflow%3ACI) | [![codecov](https://codecov.io/gh/bifurcationkit/GridapBifurcationKit.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/bifurcationkit/GridapBifurcationKit.jl) |
+
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-purple.svg
+[docs-dev-url]: https://bifurcationkit.github.io/GridapBifurcationKit.jl/dev
 
 
 This Julia package aims at performing **automatic bifurcation analysis** of PDE solved using the Finite Elements Method (FEM) with the Julia package [Gridap.jl](https://github.com/gridap/Gridap.jl).
@@ -40,4 +43,4 @@ You need to cite this entry **as well**
 
 ## Main features
 
-Most [features](https://bifurcationkit.github.io/BifurcationKitDocs.jl/dev/capabilities/) of [BifurcationKit](https://github.com/rveltz/BifurcationKit.jl) are ported, please see the `examples` folder or the [tutorials](https://bifurcationkit.github.io/BifurcationKitDocs.jl/stable/tutorials/mittelmannGridap/#d-Bratu–Gelfand-problem-with-[Gridap.jl](https://github.com/gridap/Gridap.jl)-(Intermediate)) for example of use.
+Most [features](https://bifurcationkit.github.io/BifurcationKitDocs.jl/dev/capabilities/) of [BifurcationKit](https://github.com/rveltz/BifurcationKit.jl) are ported, please see the `examples` folder or the [tutorials](https://bifurcationkit.github.io/GridapBifurcationKit.jl/dev/tutorials/tutorials/) for example of use.
