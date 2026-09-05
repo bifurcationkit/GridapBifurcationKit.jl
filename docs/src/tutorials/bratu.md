@@ -19,6 +19,7 @@ using GridapBifurcationKit
 using BifurcationKit
 const BK = BifurcationKit
 BK.set_plot_backend!(BK.BK_Makie())
+CairoMakie.activate!() # hide
 
 # custom plot function to deal with Gridap
 function plotgridap!(ax, x; k...)
