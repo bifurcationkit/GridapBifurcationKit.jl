@@ -41,7 +41,7 @@ w .= (1 .+ LinRange(-1,1,n+1)) * transpose(LinRange(-1,1,n+1)) |> vec
 w .-= minimum(w)
 normbratu(x) = norm(x .* w) / sqrt(length(x))
 
-prob = GridapBifProblem(res, uh, par_bratu, V, U, (@optic _.λ);
+prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
                 jac = jac,
                 # d2res = d2res,
                 # d3res = d3res,
@@ -60,35 +60,38 @@ br = continuation(prob, PALC(tangent = Bordered()), opts;
 
 plot(br)
 
-nf = get_normal_form(br, 2; verbose = true, scaleζ = norminf)
+nf = get_normal_form(br, 2; verbose = true, scaleζ = norminf, start_with_eigen = Val(false))
 ####################################################################################################
 br1 = continuation(br, 3,
-        ContinuationPar(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
+        ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
         verbosity = 0, plot = true, nev = 10,
         usedeflation = true,
         # scaleζ = norminf,
         autodiff = false,
+        start_with_eigen = Val(false),
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
 plot(br, br1)
 
-br2 = continuation(br1, 3,
-        ContinuationPar(opts;ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
+br2 = continuation(br1, 2,
+        ContinuationPar(BifurcationKit.getcontparams(br);ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
         verbosity = 0, plot = true, nev = 10,
         usedeflation = true,
         autodiff = false,
+        start_with_eigen = Val(false),
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
 plot(br, br1, br2, legend=false)
 
 br3 = continuation(br, 2,
-        ContinuationPar(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 0);
+        ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
         verbosity = 0, plot = true,
         usedeflation = true,
         verbosedeflation = false,
         autodiff = false,
+        start_with_eigen = Val(false),
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 

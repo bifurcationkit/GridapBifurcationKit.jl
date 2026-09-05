@@ -1,4 +1,5 @@
-struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls}
+
+struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls, TOm, Tm}
     res::Tres        # res(u, p, v),                 residual
     jac::Tjac        # jac(u, p, du, v),             jacobian
     d2res::Td2res    # d2res(u, du1, du2, v)
@@ -6,6 +7,8 @@ struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls}
     V::TV
     U::TU
     ls::Tls
+    dΩ::TOm
+    mass::Tm
 end
 
 # rebuild a gridap operator for each parameter value
@@ -71,9 +74,69 @@ end
 #     algop = Gridap.FESpaces.get_algebraic_operator(op)
 #     return Gridap.FESpaces.residual(algop, u)
 # end
+
+mass_default(u,v,dΩ) = ∫(u⋅v) * dΩ
+
+"""
+    get_mass_matrix(prob::GridapBifProblem)
+    get_mass_matrix(prob::GridapProblem, dΩ = prob.dΩ)
+
+Assemble the (sparse) mass matrix associated to the problem, on the free dofs of the
+trial/test spaces (Dirichlet dofs are eliminated, consistently with the jacobian).
+
+The integrand is the one passed to `GridapBifProblem(...; mass = ...)`, defaulting to the
+L² mass `∫(u⋅v)*dΩ`. For an incompressible flow, a typical choice is the *velocity only*
+mass `(u,p),(v,q) -> ∫(v⊙u)*dΩ`, which yields a singular mass matrix with a zero pressure
+block, as required for the stability of the differential-algebraic system
+``M\\dot z = F(z, p)``.
+"""
+function get_mass_matrix(prob::GridapProblem, dΩ = prob.dΩ)
+    (;U, V) = prob
+    mm = isnothing(prob.mass) ? (u,v) -> mass_default(u,v,dΩ) : prob.mass
+    v = get_fe_basis(V)
+    u = get_trial_fe_basis(U)
+    assemblytuple = Gridap.FESpaces.collect_cell_matrix(U,V,mm(u,v))
+    cell_matrix_MM   = collect(assemblytuple[1][1]) # This result is no longer a LazyArray
+    newassemblytuple = ([cell_matrix_MM], assemblytuple[2], assemblytuple[3])
+    a = SparseMatrixAssembler(U, V)
+    L2MM = assemble_matrix(a, newassemblytuple)
+    return L2MM
+end
 ################################################################################
 # structure to help casting the functional in a way that BifurcationKit can use
-struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: BifurcationKit.AbstractBifurcationProblem
+"""
+    GridapBifProblem(res, u0, parms, V, U, dΩ, lens; jac = nothing, mass = nothing, kwargs...)
+
+Construct a bifurcation problem which encodes a system of PDEs discretized with
+[`Gridap`](https://github.com/gridap/Gridap.jl). It is a subtype of
+`BifurcationKit.AbstractDAEBifProblem` so that a (possibly singular) mass matrix can be
+used for the stability analysis, *e.g.* for Hopf bifurcations.
+
+# Arguments
+- `res(u, p, v)`: residual of the (semi-)discretized problem, where `p` are the parameters.
+- `u0`: initial guess (a `Gridap` `FEFunction` or its free dof values).
+- `parms`: the set of parameters.
+- `V`: `TestFESpace`.
+- `U`: `TrialFESpace`.
+- `dΩ`: the `Measure` used to assemble the residual (stored for the mass matrix).
+- `lens`: an `Accessors` lens selecting the continuation parameter in `parms`, *e.g.*
+  `(@optic _.λ)`.
+
+# Keyword arguments
+- `jac(u, p, du, v)`: analytical jacobian. If `nothing`, it is computed by finite differences.
+- `d2res(u, p, du1, du2, v)`, `d3res(u, p, du1, du2, du3, v)`: second and third derivatives,
+  required for automatic branch switching with a non-simple kernel.
+- `mass(u, v)`: integrand of the mass matrix, *e.g.* `(u,v) -> ∫(u⋅v)*dΩ`. If `nothing`,
+  the default L² mass `∫(u⋅v)*dΩ` is used (see [`get_mass_matrix`](@ref)).
+- `record_from_solution`, `plot_solution`, `R01`, `R02`, `R11`, `delta`: see the
+  `BifurcationKit` documentation.
+
+# Extended methods
+- [`get_mass_matrix`](@ref) assembles the mass matrix associated to `mass`.
+- `BifurcationKit.is_mass_matrix_constant` and `BifurcationKit.getmassmatrix` are
+  specialized so that the mass matrix is used by the DAE eigensolvers.
+"""
+struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: BifurcationKit.AbstractDAEBifProblem
     "gridap problem"
     probFE::Tfe
     "Initial guess"
@@ -96,35 +159,22 @@ import BifurcationKit: _getvectortype
 
 BifurcationKit._getvectortype(::GridapProblem{Tfe, Tu}) where {Tfe, Tu} = Tu
 BifurcationKit._getvectortype(pb::GridapBifProblem) = BifurcationKit._getvectortype(pb.probFE)
-BifurcationKit.isinplace(pb::GridapBifProblem) = false
+BifurcationKit.isinplace(::GridapBifProblem) = false
 BifurcationKit.residual(pb::GridapBifProblem, u, p) = residual(pb.probFE, u, p)
 BifurcationKit.jacobian(pb::GridapBifProblem, u, p) = jacobian(pb.probFE, u, p)
 BifurcationKit.dF(pb::GridapBifProblem, u, p, dx) = BifurcationKit.apply(BifurcationKit.jacobian(pb, u, p), dx)
 BifurcationKit.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
 BifurcationKit.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
-BifurcationKit.is_symmetric(pb::GridapBifProblem) = false
-BifurcationKit.has_adjoint(pb::GridapBifProblem) = false
+BifurcationKit.is_symmetric(::GridapBifProblem) = false
+BifurcationKit.has_adjoint(::GridapBifProblem) = false
 BifurcationKit.getdelta(pb::GridapBifProblem) = pb.δ
 BifurcationKit.save_solution(::GridapBifProblem, x, p) = x
 BifurcationKit.has_adjoint_MF(::GridapBifProblem) = false # TODO improve this using AD
 BifurcationKit.update!(::GridapBifProblem, args...) = true
 BifurcationKit.residual!(prob::GridapBifProblem, out, x, p) = out .= BK.residual(prob, x, p)
 
-# constructors
-"""
-    GridapBifProblem(res, jac, V, U; autodiff = false, linsolver = nothing)
-
-Construct a `GridapBifProblem` which encodes the PDE using Gridap.
-
-# Arguments
-- `res`: method which computes the residual, `res(u, p, v)` where `p` are parameters passed to the problem.
-- `jac` method which computes the jacobian, `jac(u, p, du, v)` where `p` are parameters passed to the problem.
-- `V`: TestFESpace
-- `U`: TrialFESpace
-
-This formulation allows to pass the second and third derivatives of the residual. This is required if one wants to to automatic branch switching. For example one must be able to call `d2res(u, p, du1, du2, v)`.
-"""
-function GridapBifProblem(res, u0, parms, V, U, lens;
+# constructors (see docstring of the `GridapBifProblem` type above)
+function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
                 autodiff = false,
                 jac = nothing,
                 d2res = nothing,
@@ -135,15 +185,16 @@ function GridapBifProblem(res, u0, parms, V, U, lens;
                 R02 = BK.FiniteDifferences(),
                 R11 = BK.FiniteDifferences(),
                 delta = BK._getprecision(Gridap.get_free_dof_values(u0)),
+                mass = nothing,
                 kwargs_jet...)
     jacFE =  autodiff ? nothing : jac
-    probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing)
+    probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing, dΩ, mass)
     # type unstable but simplifies the types a lot
-    jet = BK.Jet(;δ = delta, R01 , R02, R11, kwargs_jet...)
+    jet = BK.Jet(; δ = delta, R01, R02, R11, kwargs_jet...)
     return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plot_solution, record_from_solution, delta, jet)
 end
 
-get_mass_matrix(prob::GridapBifProblem, dΩ) = get_mass_matrix(prob.probFE, dΩ)
+get_mass_matrix(prob::GridapBifProblem) = get_mass_matrix(prob.probFE)
 BK.has_hessian(prob::GridapBifProblem) = BK.has_hessian(prob.VF)
 
 BK.R01(prob::GridapBifProblem, x, p) = BK.R01(BK.has_R01_trait(prob.jet), prob, x, p)
@@ -153,3 +204,6 @@ BK.R02(::BK.TraitUserPassed, prob::GridapBifProblem, x, p) = prob.jet.R02(x, p)
 
 BK.R11(prob::GridapBifProblem, x, p, dx) = BK.R11(BK.has_R11_trait(prob.jet), prob, x, p, dx)
 BK.R11(::BK.TraitUserPassed, prob::GridapBifProblem, x, p, dx) = prob.jet.R11(x, p, dx)
+
+BK.is_mass_matrix_constant(::GridapBifProblem) = true
+BK.getmassmatrix(prob::GridapBifProblem, x, p) = get_mass_matrix(prob)

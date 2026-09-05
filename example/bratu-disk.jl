@@ -105,10 +105,10 @@ w .= (1 .+ LinRange(-1,1,n)) |> vec
 w .-= minimum(w)
 normbratu(x) = norm(x .* w) / sqrt(length(x))
 
-prob = GridapBifProblem(res, uh, par_bratu, V, U, (@optic _.λ);
+prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
                 jac,
-                d2res = d2res,
-                d3res = d3res,
+                d2res,
+                d3res,
                 plot_solution = (ax,x,p; k...) -> plotgridap!(ax, x;  k...),
                 record_from_solution = (x, p; k...) -> normbratu(x))
 end
@@ -119,19 +119,19 @@ sol = BifurcationKit.solve(prob, Newton(), NewtonPar(optn; verbose = true))
 opts = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6)
 br = continuation(prob, PALC(tangent = Bordered()), opts;
     plot = true,
-    verbosity = 1,
+    # verbosity = 1,
     )
 
 BifurcationKit.plot(br)
 
-nf = get_normal_form(br, 4; verbose = true, scaleζ = norminf)
+nf = get_normal_form(br, 4; verbose = true, scaleζ = norminf, start_with_eigen = Val(false))
 ####################################################################################################
 br1 = continuation(br, 4,
-        ContinuationPar(opts; ds = 0.001, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
+        ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.001, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
         verbosity = 1, plot = true, nev = 10,
         # usedeflation = true,
         scaleζ = norminf,
-        autodiff = false,
+        start_with_eigen = Val(false),
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
@@ -141,12 +141,13 @@ diagram = @time bifurcationdiagram(prob, PALC(),
     # important argument: this is the maximal
     # recursion level
     3,
-    ContinuationPar(opts; ds = 0.001, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
+    ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.001, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
     verbosity = 0, plot = true,
     # callback_newton = cb,
     # usedeflation = true,
     # finalise_solution = finSol,
     autodiff = false,
+    start_with_eigen = Val(false),
     verbosediagram = true,
     normC = norminf)
 
