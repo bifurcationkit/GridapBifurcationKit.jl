@@ -12,7 +12,7 @@ $$\Delta u + NL(\lambda,u) = 0$$
 with Neumann boundary condition on $\Omega = (0,1)^2$ and where $NL(\lambda,u)\equiv-10(u-\lambda e^u)$. This is a good example to show how automatic branch switching works and also nonlinear deflation.
 
 ```@example BRATU
-using Revise, Plots
+using Plots
 using Gridap
 using Gridap.FESpaces
 using GridapBifurcationKit

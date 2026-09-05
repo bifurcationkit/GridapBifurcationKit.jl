@@ -61,5 +61,5 @@ deploydocs(
 	repo = "github.com/bifurcationkit/GridapBifurcationKit.jl.git",
 	push_preview = true, 
 	target = "build", 
-	devbranch = "main"
+	devbranch = "master"
 	)
