@@ -15,9 +15,11 @@ with Neumann boundary condition on $\Omega = (0,1)^2$ and where $NL(\lambda,u)\e
 using CairoMakie
 using Gridap
 using Gridap.FESpaces
+
 using GridapBifurcationKit
 using BifurcationKit
 const BK = BifurcationKit
+
 BK.set_plot_backend!(BK.BK_Makie())
 CairoMakie.activate!() # hide
 
@@ -35,7 +37,7 @@ We are now ready to specify the problem using the setting of **Gridap.jl**: it a
 # discretisation
 n = 40
 domain = (0, 1, 0, 1)
-cells = (n,n)
+cells = (n, n)
 model = CartesianDiscreteModel(domain,cells)
 
 # function spaces
@@ -94,7 +96,7 @@ br = continuation(prob, PALC(tangent = Bordered()), optc;
 ```
 
 ```@example BRATU
-f,ax = BK.plot(br)
+f,ax = BK.plot(br; dash_unstable_style = true)
 f
 ```
 
@@ -117,7 +119,7 @@ br1 = continuation(br, 3,
 You can also plot the two branches together:
 
 ```@example BRATU
-f, ax = plot(br,br1,plotfold=false)
+f, ax = BK.plot(br,br1,plotfold=false; dash_unstable_style = true)
 f
 ```
 
@@ -132,7 +134,7 @@ br2 = continuation(br1, 1,
         scaleζ = norminf,
         callback_newton = BK.cbMaxNorm(10),
         )
-f, ax = plot(br, br1, br2)
+f, ax = BK.plot(br, br1, br2; dash_unstable_style = true)
 f
 ```
 
@@ -155,7 +157,7 @@ branches = continuation(br, 2,
 You can plot the branches using
 
 ```@example BRATU
-f, ax = plot(br1, br2, branches..., br)
+f, ax = BK.plot(br1, br2, branches..., br; dash_unstable_style = true)
 f
 ```
 
