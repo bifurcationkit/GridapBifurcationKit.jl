@@ -1,4 +1,4 @@
-# [🟢 1d Bratu model](@id bratu)
+# [🟢 2d Bratu model](@id bratu)
 
 ```@contents
 Pages = ["bratu.md"]
@@ -17,6 +17,7 @@ using Gridap
 using Gridap.FESpaces
 using GridapBifurcationKit
 using BifurcationKit
+const BK = BifurcationKit
 
 # custom plot function to deal with Gridap
 plotgridap!(x; k...) = (n=isqrt(length(x));heatmap!(reshape(x,n,n); color=:viridis, k...))
@@ -68,27 +69,21 @@ w .-= minimum(w)
 normbratu(x) = norm(x .* w) / sqrt(length(x))
 
 # problem definition
-prob = GridapBifProblem(res, uh, par_bratu, V, U, (@lens _.λ);
+prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
                 jac = jac,
                 # d2res = d2res,
                 # d3res = d3res,
                 plot_solution = (x,p; k...) -> plotgridap!(x;  k...),
-                record_from_solution = (x, p) -> normbratu(x))
-```
-
-We can call then the newton solver:
-
-```@example BRATU
-optn = NewtonPar(eigsolver = EigArpack())
-sol = newton(prob, NewtonPar(optn; verbose = true))
+                record_from_solution = (x, p;k...) -> normbratu(x))
 ```
 
 In the same vein, we can continue this solution as function of $\lambda$:
 
 ```@example BRATU
-opts = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6)
-br = continuation(prob, PALC(tangent = Bordered()), opts;
-	plot = true,
+optn = NewtonPar(eigsolver = EigArpack())
+optc = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6)
+br = continuation(prob, PALC(tangent = Bordered()), optc;
+	# plot = true,
 	verbosity = 0,
 	)
 ```
@@ -98,18 +93,18 @@ title!("")
 ```
 
 
-
 ## Automatic branch switching at simple branch points
 
 We can compute the branch off the third bifurcation point:
 
 ```@example BRATU
 br1 = continuation(br, 3,
-        ContinuationPar(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
-        verbosity = 0, plot = true, nev = 10,
-        # usedeflation = true,
+        ContinuationPar(BK.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140);
+        # verbosity = 0, plot = true, 
+        nev = 10,
+        start_with_eigen = Val(false),
         scaleζ = norminf,
-        callback_newton = BifurcationKit.cbMaxNorm(100),
+        callback_newton = BK.cbMaxNorm(10),
         )
 title!("")
 ```
@@ -123,12 +118,13 @@ scene = plot(br,br1,plotfold=false)
 We continue our journey and compute the branch bifurcating of the first bifurcation point from the last branch we computed:
 
 ```@example BRATU
-br2 = continuation(br1, 3,
-        ContinuationPar(opts;ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
-        verbosity = 0, plot = true, nev = 10,
-        # usedeflation = true,
+br2 = continuation(br1, 1,
+        ContinuationPar(BK.getcontparams(br1);ds = 0.005, dsmax = 0.05, max_steps = 140);
+        # verbosity = 0, plot = true, 
+        nev = 10,
+        start_with_eigen = Val(false),
         scaleζ = norminf,
-        callback_newton = BifurcationKit.cbMaxNorm(100),
+        callback_newton = BK.cbMaxNorm(10),
         )
 scene = plot(br, br1, br2)
 ```
@@ -141,18 +137,18 @@ The call for automatic branch switching is the same as in the case of simple bra
 
 ```@example BRATU
 branches = continuation(br, 2,
-        ContinuationPar(opts; ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 0);
-        verbosity = 0, plot = true,
+        # verbosity = 0, plot = true,
+        start_with_eigen = Val(false),
         usedeflation = true,
         verbosedeflation = false,
-        callback_newton = BifurcationKit.cbMaxNorm(100),
+        callback_newton = BK.cbMaxNorm(10),
         )
 ```
 
 You can plot the branches using
 
 ```@example BRATU
-scene = plot(br, branches...)
+scene = plot(br1, br2, branches..., br)
 ```
 
 ## References
