@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>🟢 Bratu–Gelfand on an unstructured disk mesh · Bifurcation of PDEs based on Gridap in Julia</title><meta name="title" content="🟢 Bratu–Gelfand on an unstructured disk mesh · Bifurcation of PDEs based on Gridap in Julia"/><meta property="og:title" content="🟢 Bratu–Gelfand on an unstructured disk mesh · Bifurcation of PDEs based on Gridap in Julia"/><meta property="twitter:title" content="🟢 Bratu–Gelfand on an unstructured disk mesh · Bifurcation of PDEs based on Gridap in Julia"/><meta name="description" content="Documentation for Bifurcation of PDEs based on Gridap in Julia."/><meta property="og:description" content="Documentation for Bifurcation of PDEs based on Gridap in Julia."/><meta property="twitter:description" content="Documentation for Bifurcation of PDEs based on Gridap in Julia."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><script src="https://bifurcationkit.github.io/assets/js/documentation.js"></script><link href="https://bifurcationkit.github.io/assets/css/documentation.css" rel="stylesheet" type="text/css"/><link href="../../assets/documentercodeblocks/juliasyntax-tokens.css" rel="stylesheet" type="text/css"/><link href="../../assets/documentercodeblocks/line-numbers.css" rel="stylesheet" type="text/css"/><script src="../../assets/documentercodeblocks/line-numbers.js"></script><link href="../../assets/documentercodeblocks/ref-popup.css" rel="stylesheet" type="text/css"/><script src="../../assets/documentercodeblocks/ref-popup.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Bifurcation of PDEs based on Gridap in Julia logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Bifurcation of PDEs based on Gridap in Julia</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">🏠 Home</a></li><li><a class="tocitem" href="../tutorials/">📎 Tutorials</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">🧩 Problems</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../problems/">Bifurcation Problem</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">🧰 Functionalities</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><input class="collapse-toggle" id="menuitem-4-1" type="checkbox"/><label class="tocitem" for="menuitem-4-1"><span class="docs-label">Bifurcations</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../detectionBifurcation/">Bifurcation detection (codim 1)</a></li><li><a class="tocitem" href="../../codim2Continuation/">Fold / Hopf Continuation (codim 2)</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-2" type="checkbox"/><label class="tocitem" for="menuitem-4-2"><span class="docs-label">Normal form</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../simplebp/">Simple branch point</a></li><li><a class="tocitem" href="../../simplehopf/">Simple Hopf point</a></li></ul></li><li><a class="tocitem" href="../../branchswitching/">Branch switching</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">⚙️ Options</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../eigensolver/">Eigen Solvers</a></li></ul></li><li><a class="tocitem" href="../../faq/">❓ Frequently Asked Questions</a></li><li><a class="tocitem" href="../../library/">📚 Library</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>🟢 Bratu–Gelfand on an unstructured disk mesh</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>🟢 Bratu–Gelfand on an unstructured disk mesh</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/bifurcationkit/GridapBifurcationKit.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/bifurcationkit/GridapBifurcationKit.jl/blob/master/docs/src/tutorials/bratu-disk.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="bratu-disk"><a class="docs-heading-anchor" href="#bratu-disk">🟢 Bratu–Gelfand on an unstructured disk mesh</a><a id="bratu-disk-1"></a><a class="docs-heading-anchor-permalink" href="#bratu-disk" title="Permalink"></a></h1><ul><li><a href="#bratu-disk">🟢 Bratu–Gelfand on an unstructured disk mesh</a></li><li class="no-marker"><ul><li><a href="#Building-the-disk-mesh-with-Gmsh">Building the disk mesh with Gmsh</a></li><li><a href="#Bifurcation-problem">Bifurcation problem</a></li><li><a href="#Continuation-and-branch-switching">Continuation and branch switching</a></li><li><a href="#References">References</a></li></ul></li></ul><p>We consider again the Bratu–Gelfand problem of Mittelmann <sup class="footnote-reference"><a id="citeref-Farrell" href="#footnote-Farrell" class="footnote-ref">[Farrell]</a><span class="footnote-preview" id="fn-Farrell"></span></sup> <sup class="footnote-reference"><a id="citeref-Wouters" href="#footnote-Wouters" class="footnote-ref">[Wouters]</a><span class="footnote-preview" id="fn-Wouters"></span></sup>:</p><p class="math-container">\[\Delta u + NL(\lambda,u) = 0,\qquad NL(\lambda,u)\equiv -10(u-\lambda e^u),\]</p><p>with Neumann boundary conditions, but this time the domain is a <strong>disk</strong> discretized with an <strong>unstructured mesh</strong> generated by <a href="https://gmsh.info/">Gmsh</a> through <code>GridapGmsh.jl</code>. The solution and the mesh are visualized with <code>GridapMakie.jl</code>. This example shows how automatic branch switching works on an unstructured mesh.</p><pre><code class="language- hljs">using CairoMakie
+CairoMakie.activate!()
+using LinearAlgebra
+using GridapGmsh
+using GridapGmsh: gmsh
+using GridapMakie
+using Gridap
+using Gridap.FESpaces
+using GridapBifurcationKit
+using BifurcationKit
+const BK = BifurcationKit
+BK.set_plot_backend!(BK.BK_Makie())
+
+# plot a solution given its free dof values
+function plotgridap!(ax, x::Vector; k...)
+    uh = zero(U)
+    uh.free_values .= x
+    plotgridap!(ax, uh; k...)
+end
+
+plotgridap!(ax, x; k...) = plot!(ax, Ω, x)</code></pre><h2 id="Building-the-disk-mesh-with-Gmsh"><a class="docs-heading-anchor" href="#Building-the-disk-mesh-with-Gmsh">Building the disk mesh with Gmsh</a><a id="Building-the-disk-mesh-with-Gmsh-1"></a><a class="docs-heading-anchor-permalink" href="#Building-the-disk-mesh-with-Gmsh" title="Permalink"></a></h2><p>We build the geometry of a disk from three circle arcs and generate a 2d mesh:</p><pre><code class="language- hljs">function buildDisk(h::Float64, R, filename = &quot;MyDisk.msh&quot;)
+    gmsh.initialize()
+    model = gmsh.model
+
+    # center of the disk
+    center = model.geo.addPoint(0, 0, 0, h, -1)
+
+    # three points on the circle
+    points = []
+    Nd = 3
+    for j in 1:Nd
+        push!(points, model.geo.addPoint(R*cos(2*pi*j/Nd), R*sin(2*pi*j/Nd), 0, h))
+    end
+
+    # three circle arcs
+    lines = []
+    for j in 1:Nd
+        push!(lines, model.geo.addCircleArc(points[j], center, points[j+1 &lt; Nd+1 ? j + 1 : 1]))
+    end
+
+    # curve loop and surface
+    curveloop = model.geo.addCurveLoop([1, 2, 3])
+    disk = model.geo.addPlaneSurface([curveloop])
+
+    # synchronize CAD with the GMSH model
+    gmsh.model.geo.synchronize()
+
+    # physical groups
+    t1 = gmsh.model.addPhysicalGroup(1, lines, 1)
+    gmsh.model.addPhysicalGroup(2, [disk], 10)
+    gmsh.model.setPhysicalName(1, t1, &quot;boundary&quot;)
+
+    # generate and write the mesh
+    model.mesh.generate(2)
+    gmsh.write(filename)
+    gmsh.finalize()
+end
+
+# specify a rough number of triangles N
+buildDisk(N::Int, R, filename = &quot;MyDisk.msh&quot;) = buildDisk(√(2*R*pi/N), R, filename)
+
+buildDisk(800, 1)</code></pre><p>We then load the mesh in <code>Gridap</code>:</p><pre><code class="language- hljs">model = GmshDiscreteModel(&quot;MyDisk.msh&quot;)
+const Ω = Triangulation(model)
+num_cells(Ω)</code></pre><p>and visualize the triangulation with <code>GridapMakie</code>:</p><pre><code class="language- hljs">fig = Figure()
+ax = Axis(fig[1, 1])
+plot!(ax, Ω)
+wireframe!(ax, Ω; color = :black, linewidth = 2)
+scatter!(ax, Ω; marker = :star8, markersize = 20, color = :blue)
+fig</code></pre><h2 id="Bifurcation-problem"><a class="docs-heading-anchor" href="#Bifurcation-problem">Bifurcation problem</a><a id="Bifurcation-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Bifurcation-problem" title="Permalink"></a></h2><p>The weak forms are the same as in the <a href="../bratu/#bratu">1d Bratu model</a>:</p><pre><code class="language- hljs">order = 1
+reffe = ReferenceFE(lagrangian, Float64, order)
+V = TestFESpace(model, reffe, conformity = :H1)
+U = TrialFESpace(V)
+
+degree = 2*order
+dΩ = Measure(Ω, degree)
+
+NL(u) = exp(u)
+res(u, p, v)                = ∫( -∇(v)⋅∇(u) - v ⋅ (u - p.λ ⋅ (NL ∘ u)) * 10 ) * dΩ
+jac(u, p, du, v)            = ∫( -∇(v)⋅∇(du) - v ⋅ du ⋅ (1 - p.λ * (NL ∘ u)) * 10 ) * dΩ
+d2res(u, p, du1, du2, v)    = ∫( v ⋅ du1 ⋅ du2 ⋅ (NL ∘ u) * 10 * p.λ ) * dΩ
+d3res(u, p, du1, du2, du3, v)= ∫( v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ (NL ∘ u) * 10 * p.λ ) * dΩ
+
+uh = zero(U)
+par_bratu = (λ = 0.01,)
+
+# weight for normbratu
+const w = cumsum(ones(length(uh.free_values))) / length(uh.free_values)
+n = length(uh.free_values)
+w .= (1 .+ LinRange(-1, 1, n)) |&gt; vec
+w .-= minimum(w)
+normbratu(x) = norm(x .* w) / sqrt(length(x))
+
+prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
+                jac, d2res, d3res,
+                plot_solution = (ax, x, p; k...) -&gt; plotgridap!(ax, x; k...),
+                record_from_solution = (x, p; k...) -&gt; normbratu(x))</code></pre><p>We can compute a solution and visualize it:</p><pre><code class="language- hljs">optn = NewtonPar(eigsolver = EigArpack())
+sol = BifurcationKit.solve(prob, Newton(), NewtonPar(optn; verbose = true))
+
+fig = Figure()
+ax = Axis(fig[1, 1])
+plotgridap!(ax, sol.u)
+fig</code></pre><h2 id="Continuation-and-branch-switching"><a class="docs-heading-anchor" href="#Continuation-and-branch-switching">Continuation and branch switching</a><a id="Continuation-and-branch-switching-1"></a><a class="docs-heading-anchor-permalink" href="#Continuation-and-branch-switching" title="Permalink"></a></h2><p>We continue the solution as a function of <span>$\lambda$</span> and detect the bifurcation points:</p><pre><code class="language- hljs">opts = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000,
+        detect_bifurcation = 3, newton_options = optn, nev = 20,
+        tol_stability = 1e-6, n_inversion = 6)
+
+br = continuation(prob, PALC(tangent = Bordered()), opts; verbosity = 0)
+
+f, ax = BK.plot(br; dash_unstable_style = true)
+f</code></pre><p>The normal form of the fourth bifurcation point gives the type of the branch point:</p><pre><code class="language- hljs">nf = get_normal_form(br, 4; verbose = false, scaleζ = norminf, start_with_eigen = Val(false))</code></pre><p>We then switch to the bifurcated branch:</p><pre><code class="language- hljs">br1 = continuation(br, 4,
+        ContinuationPar(BK.getcontparams(br); ds = 0.001, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
+        verbosity = 0, nev = 10,
+        plot = true,
+        scaleζ = norminf,
+        start_with_eigen = Val(false),
+        callback_newton = BK.cbMaxNorm(100))
+Makie.current_figure()</code></pre><pre><code class="language- hljs">f, ax = BK.plot(br, br1...; dash_unstable_style = true)
+f</code></pre><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><section class="footnotes is-size-7"><ul><li class="footnote" id="footnote-Farrell"><a class="tag is-link" href="#citeref-Farrell">Farrell</a><blockquote><p>Farrell, Patrick E., Casper H. L. Beentjes, and Ásgeir Birkisson. <strong>The Computation of Disconnected Bifurcation Diagrams.</strong> ArXiv:1603.00809 [Math], March 2, 2016.</p></blockquote></li><li class="footnote" id="footnote-Wouters"><a class="tag is-link" href="#citeref-Wouters">Wouters</a><blockquote><p>Wouters. <strong>Automatic Exploration Techniques for the Numerical Continuation of Large–Scale Nonlinear Systems</strong>, 2019.</p></blockquote></li></ul></section></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Friday 11 September 2026 16:32">Friday 11 September 2026</span>. Using Julia version 1.10.12.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
