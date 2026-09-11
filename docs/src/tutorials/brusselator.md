@@ -172,7 +172,6 @@ opts_po_cont = BK.ContinuationPar(dsmin = 0.001, dsmax = 0.04, ds = 0.01,
         p_max = 2.0, max_steps = 50, newton_options = opt_po,
         detect_bifurcation = 3, nev = 11, tol_stability = 1e-4)
 
-
 probFD = BK.Trapeze(; M = 41,
         jacobian = BK.FullSparseInplace(),
         massmatrix = BK.getmassmatrix(prob, nothing, nothing))
@@ -180,17 +179,21 @@ probFD = BK.Trapeze(; M = 41,
 br_po = BK.continuation(br, 1, opts_po_cont, probFD;
         start_with_eigen = Val(false),
         δp = 0.01,
-        verbosity = 3, 
-        plot=true,
         plot_solution = (ax, x, p; ax1, iter, state, k...) -> begin
             _sol = BK.get_periodic_orbit(BK.getprob(iter), x, p.p)
             heatmap!(ax, _sol.u'; colormap = :viridis, k...)
         end,
         normC = BK.norminf)
-Makie.current_figure() # show current figure
 ```
 
 ```@example BRUSSELATOR
-f, ax = BK.plot(br_po)#; dash_unstable_style = true)
+f, ax = BK.plot(br_po; dash_unstable_style = true)
+f
+```
+
+```@example BRUSSELATOR
+sol = BK.get_periodic_orbit(br_po, 20)
+f = Figure(); ax = Axis(f[1,1], title = "Periodic solution", ylabel = "time")
+heatmap!(ax, 1:2Nx, sol.t, sol.u)
 f
 ```
