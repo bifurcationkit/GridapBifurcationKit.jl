@@ -10,8 +10,21 @@ The tutorials are rated by the following scale of difficulty
 ## PDEs: bifurcations of equilibria
 
 ```@contents
-Pages = ["bratu.md", "plate.md", "gp.md"]
+Pages = ["bratu.md"]
 Depth = 1
 ```
 
+## PDEs: unstructured meshes
+
+```@contents
+Pages = ["bratu-disk.md"]
+Depth = 1
+```
+
+## PDEs: equilibria, Hopf bifurcation and periodic orbits
+
+```@contents
+Pages = ["brusselator.md"]
+Depth = 1
+```
 ## PDEs: bifurcations of periodic orbits

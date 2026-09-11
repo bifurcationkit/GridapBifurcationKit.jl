@@ -2,13 +2,19 @@ cd(@__DIR__)
 using Pkg
 pkg"activate ."
 
-using Revise, Plots
+using Revise
+using CairoMakie
+CairoMakie.activate!()
 using Gridap
 using Gridap.FESpaces
 using GridapBifurcationKit
 using BifurcationKit
-plotgridap!(x; k...) = (n=Int(sqrt(length(x)));heatmap!(reshape(x,n,n); color=:viridis, k...))
-plotgridap(x; k...) =( plot();plotgridap!(x; k...))
+BifurcationKit.set_plot_backend!(BifurcationKit.BK_Makie())
+function plotgridap!(ax, x; k...)
+    n = Int(sqrt(length(x)))
+    heatmap!(ax, reshape(x, n, n); colormap = :viridis, k...)
+end
+plotgridap(x; k...) = (fig = Figure(); ax = Axis(fig[1, 1]); plotgridap!(ax, x; k...); fig)
 #############################################
 # discretisation
 n = 40
@@ -45,7 +51,7 @@ prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
                 jac = jac,
                 # d2res = d2res,
                 # d3res = d3res,
-                plot_solution = (x,p; k...) -> plotgridap!(x;  k...),
+                plot_solution = (ax, x, p; ax1 = nothing, k...) -> plotgridap!(ax, x; k...),
                 record_from_solution = (x, p; k...) -> normbratu(x))
 
 # factorize leads pivots issues, better use LU factorization here
@@ -83,7 +89,7 @@ br2 = continuation(br1, 2,
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
-plot(br, br1, br2, legend=false)
+plot(br, br1, br2)
 
 br3 = continuation(br, 2,
         ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
@@ -95,5 +101,5 @@ br3 = continuation(br, 2,
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
-plot(br, br1, br2, br3..., legend=false)
+plot(br, br1, br2, br3...)
 plot(br, br3...)
