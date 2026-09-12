@@ -463,6 +463,15 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
   *e.g.* `(@optic _.λ)`, or `(@optic _[1])` for a `Vector` of parameters.
 
 # Keyword arguments
+- `jacobian_type = BK.FullSparse()`: selects how `BK.jacobian(prob, x, p)` is
+  evaluated. Accepted values:
+  * `BK.FullSparse()` (default): a fresh sparse matrix is assembled at each call;
+  * `BK.FullSparseInplace()`: a sparse matrix is preallocated when the problem is
+    built and updated in place at each call (faster, but the sparsity pattern of
+    the vector field must be constant);
+  * `BK.MatrixFree()`: `BK.jacobian` returns a closure `dx -> J(x,p)*dx` computed
+    by ForwardDiff on the residual, without assembling the matrix. It must be
+    used together with a matrix-free linear solver (*e.g.* `GMRESIterativeSolvers`).
 - `jac(u, p, du, v)`: analytic jacobian. If `nothing` (default), it is built by
   Gridap from `res` (automatic differentiation).
 - `autodiff = false`: if `true`, `jac` is ignored and the jacobian is built by
@@ -517,6 +526,10 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
 # Fields
 - `probFE::GridapProblem`: the parameter-agnostic FE problem, see
   [`GridapProblem`](@ref).
+- `jacobianType`: the selected jacobian kind, one of `BK.FullSparse()`,
+  `BK.FullSparseInplace()` or `BK.MatrixFree()`, see `jacobian_type`.
+- `jacobian`: the preallocated sparse matrix used by `BK.FullSparseInplace()`
+  (updated in place), or `nothing` for the other kinds.
 - `u0`: the initial state (free dof vector).
 - `params`, `lens`: the parameters and the continuation optic.
 - `plotSolution`, `recordFromSolution`: the callbacks.
@@ -527,7 +540,10 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
 - [`get_mass_matrix`](@ref) and `BK.getmassmatrix(prob, x, p)` assemble the mass
   matrix; `BK.is_mass_matrix_constant(prob)` tells whether it is constant.
 - `residual(prob, x, p)`, `jacobian(prob, x, p)` and `BK.dF`, `BK.d2F`, `BK.d3F`
-  evaluate the vector field and its derivatives.
+  evaluate the vector field and its derivatives. `BK.jacobian` dispatches on
+  `jacobian_type`: it returns a sparse matrix for `BK.FullSparse()` /
+  `BK.FullSparseInplace()` and a matrix-free closure `dx -> J(x,p)*dx` for
+  `BK.MatrixFree()`.
 - `BK.R01`, `BK.R02`, `BK.R11` evaluate the parameter derivatives.
 - `BK.R01_mass_matrix` and `BK.∇_x_mass_matrix` provide the mass derivatives
   required by the minimally augmented Hopf formulation.
@@ -553,9 +569,13 @@ sol = BK.solve(prob, BK.Newton(), optn)
 br  = BK.continuation(prob, BK.Natural(), opts)
 ```
 """
-struct GridapBifProblem{Tfe, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: BK.AbstractDAEBifProblem
+struct GridapBifProblem{Tfe, Tjac, Tjc, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: BK.AbstractDAEBifProblem
     "gridap problem"
     probFE::Tfe
+    "selected jacobian kind: `BK.FullSparse()`, `BK.FullSparseInplace()` or `BK.MatrixFree()`"
+    jacobianType::Tjac
+    "preallocated jacobian matrix for `BK.FullSparseInplace()`, `nothing` otherwise"
+    jacobian::Tjc
     "Initial guess"
     u0::Tu
     "parameters"
@@ -574,6 +594,7 @@ end
 
 # constructors (see docstring of the `GridapBifProblem` type above)
 function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
+                jacobian_type = BK.FullSparse(),
                 autodiff = false,
                 jac = nothing,
                 d2res = nothing,
@@ -606,8 +627,15 @@ function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
     R11jet = _is_jac_form(R11)      ? ((x, p, dx) -> _apply_from_biform(probFE, R11, x, p, dx)) : R11
     # type unstable but simplifies the types a lot
     jet = BK.Jet(; δ = delta, R01 = R01jet, R02 = R02jet, R11 = R11jet, kwargs_jet...)
-    return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plot_solution, record_from_solution, delta, jet)
+    x0 = Gridap.get_free_dof_values(u0)
+    J = _init_jacobian(probFE, jacobian_type, x0, parms)
+    return GridapBifProblem(probFE, jacobian_type, J, x0, parms, lens, plot_solution, record_from_solution, delta, jet)
 end
+
+# preallocate the jacobian only for the in-place flavour (a fresh matrix is
+# assembled for `FullSparse`, and none for `MatrixFree`).
+_init_jacobian(probFE::GridapProblem, ::BK.FullSparseInplace, x0, p) = jacobian(probFE, x0, p)
+_init_jacobian(::GridapProblem, ::BK.AbstractJacobianType, x0, p) = nothing
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BifurcationKit interface
@@ -626,8 +654,35 @@ BK.getdelta(pb::GridapBifProblem) = pb.δ
 
 # ─── residual, jacobian and derivatives
 BK.residual(pb::GridapBifProblem, u, p) = residual(pb.probFE, u, p)
-BK.jacobian(pb::GridapBifProblem, u, p) = jacobian(pb.probFE, u, p)
-BK.jacobian!(pb::GridapBifProblem, u, p) = jacobian!(pb.probFE, u, p)
+
+# select the jacobian flavour chosen at construction (`jacobian_type`)
+BK.jacobian(pb::GridapBifProblem, u, p) = _jacobian(pb, pb.jacobianType, u, p)
+
+# `FullSparse`: a new sparse matrix is assembled at each call
+_jacobian(pb::GridapBifProblem, ::BK.FullSparse, u, p) = jacobian(pb.probFE, u, p)
+
+# `FullSparseInplace`: update the matrix preallocated at construction (the
+# sparsity pattern is assumed constant) and return it
+function _jacobian(pb::GridapBifProblem, ::BK.FullSparseInplace, u, p)
+    jacobian!(pb.jacobian, pb.probFE, u, p)
+    return pb.jacobian
+end
+
+# `MatrixFree`: return the jacobian-vector product as a closure, without ever
+# assembling the matrix. It must be used with a matrix-free linear solver.
+_jacobian(pb::GridapBifProblem, ::BK.MatrixFree, u, p) = dx -> _jvp_ad(pb, u, p, dx)
+
+function _jacobian(pb::GridapBifProblem, jt, u, p)
+    throw(ArgumentError("jacobian_type = $jt is not supported; use BK.FullSparse(), BK.FullSparseInplace() or BK.MatrixFree()."))
+end
+
+# matrix-free jacobian-vector product by ForwardDiff on the assembled residual
+function _jvp_ad(pb::GridapBifProblem, u, p, dx)
+    𝒯 = promote_type(eltype(u), eltype(dx))
+    return ForwardDiff.derivative(ε -> _residual_dual(pb.probFE, p, u .+ ε .* dx), zero(𝒯))
+end
+
+BK.jacobian!(pb::GridapBifProblem, J, u, p) = jacobian!(J, pb.probFE, u, p)
 BK.dF(pb::GridapBifProblem, u, p, dx) = BK.apply(BK.jacobian(pb, u, p), dx)
 
 BK.d2F(pb::GridapBifProblem, u, p, dx1::AbstractArray{<:Real}, dx2::AbstractArray{<:Real}) = pb.probFE(u, p, dx1, dx2)
@@ -679,6 +734,7 @@ function Base.show(io::IO, prob::GridapBifProblem; prefix = "")
     printstyled(io, BK.get_lens_symbol(BK.getlens(prob)), color = :cyan, bold = true)
     print(io, " = ", BK.getparam(prob), "\n")
     println(io, prefix, "├─ Mass          : ", nameof(typeof(gp.mass_type)), _mass_deriv_str(gp))
+    println(io, prefix, "├─ Jacobian      : ", nameof(typeof(prob.jacobianType)), " (", _jac_name(gp.jac), ")")
     println(io, prefix, "├─ Derivatives   : jac=", _jac_name(gp.jac), ", d2res=", _deriv_name(gp.d2res), ", d3res=", _deriv_name(gp.d3res))
     println(io, prefix, "├─ R01, R02, R11 : ", (_deriv_op_name(prob.jet.R01), _deriv_op_name(prob.jet.R02), _deriv_op_name(prob.jet.R11)))
     println(io, prefix, "└─ Spaces:    test  = ", nameof(typeof(gp.V)),
