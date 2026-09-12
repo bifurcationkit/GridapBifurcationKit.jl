@@ -6,11 +6,13 @@ version = "0.7.0"
 [deps]
 BifurcationKit = "0f109fa4-8a5d-4b75-95aa-f515264e7665"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 
 [compat]
 BifurcationKit = "^0.8.5"
 FiniteDifferences = "^0.12"
+ForwardDiff = "0.10, 1"
 Gridap = "0.18, ^0.19, ^0.20"
 julia = "1.10"
 

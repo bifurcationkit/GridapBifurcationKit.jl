@@ -87,7 +87,7 @@ struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls, TOm, Tm, Tmt}
     mass_type::Tmt
 end
 
-_deriv_name(f) = f === nothing ? "missing" : "provided"
+_deriv_name(f) = f === nothing ? "missing" : f
 
 function Base.show(io::IO, gp::GridapProblem; prefix = "")
     print(io, prefix, "Gridap FE problem\n")
@@ -140,7 +140,7 @@ function _apply_from_biform(gp::GridapProblem, form, x, p, dx)
     return A * dx
 end
 
-# second derivative
+# second derivative from the analytic form `d2res`
 function (gp::GridapProblem)(u, p, du1, du2)
     du1h = FEFunction(gp.U, du1)
     du2h = FEFunction(gp.U, du2)
@@ -150,7 +150,7 @@ function (gp::GridapProblem)(u, p, du1, du2)
     Gridap.FESpaces.residual(alop, u)
 end
 
-# third derivative
+# third derivative from the analytic form `d3res`
 function (gp::GridapProblem)(u, p, du1, du2, du3)
     du1h = FEFunction(gp.U, du1)
     du2h = FEFunction(gp.U, du2)
@@ -161,15 +161,58 @@ function (gp::GridapProblem)(u, p, du1, du2, du3)
     Gridap.FESpaces.residual(alop, u)
 end
 
-# second derivative
-function (gp::GridapProblem{Tres, Tjac, Nothing})(u, p, du1, du2) where {Tres, Tjac}
+# second/third derivative by finite differences (`d2res`/`d3res` absent)
+function _d2F_fd(gp::GridapProblem, u, p, du1, du2)
     jvp(central_fdm(3, 1), z -> jacobian(gp, z, p) * du1, (u, du2))
 end
-
-# third derivative
-function (gp::GridapProblem{Tres, Tjac, Td2res, Nothing})(u, p, du1, du2, du3) where {Tres, Tjac, Td2res}
+function _d3F_fd(gp::GridapProblem, u, p, du1, du2, du3)
     jvp(central_fdm(3, 1), z -> gp(z, p, du1, du2), (u, du3))
 end
+
+# Build an FE function whose (constant) Dirichlet values share the dual eltype
+# of the free values. Gridap otherwise rejects mixing dual free values with
+# Float64 Dirichlet values.
+function _dual_fe_function(f::MultiFieldFESpace, z)
+    dir = [eltype(z).(Gridap.FESpaces.get_dirichlet_dof_values(sp)) for sp in f.spaces]
+    return FEFunction(f, z, dir)
+end
+function _dual_fe_function(f::FESpace, z)
+    return FEFunction(f, z, eltype(z).(Gridap.FESpaces.get_dirichlet_dof_values(f)))
+end
+
+# Assemble the residual at dual-typed dof values `z` into a free-dof vector
+# allocated with the dual eltype (the standard assembler would allocate a
+# Float64 vector).
+function _residual_dual(gp::GridapProblem, p, z)
+    uh = _dual_fe_function(gp.U, z)
+    v  = get_fe_basis(gp.V)
+    data = Gridap.FESpaces.collect_cell_vector(gp.V, gp.res(uh, p, v))
+    b = similar(Gridap.get_free_dof_values(zero(gp.V)), eltype(z))
+    fill!(b, zero(eltype(z)))
+    Gridap.FESpaces.assemble_vector!(b, SparseMatrixAssembler(gp.U, gp.V), data)
+    return b
+end
+
+# second/third derivative by ForwardDiff on the assembled residual (never on `jacobian`)
+function _d2F_ad(gp::GridapProblem, u, p, du1, du2)
+    return ForwardDiff.derivative(
+        ε2 -> ForwardDiff.derivative(
+            ε1 -> _residual_dual(gp, p, u .+ ε1 .* du1 .+ ε2 .* du2), 0.0), 0.0)
+end
+function _d3F_ad(gp::GridapProblem, u, p, du1, du2, du3)
+    return ForwardDiff.derivative(
+        ε3 -> ForwardDiff.derivative(
+            ε2 -> ForwardDiff.derivative(
+                ε1 -> _residual_dual(gp, p, u .+ ε1 .* du1 .+ ε2 .* du2 .+ ε3 .* du3), 0.0), 0.0), 0.0)
+end
+
+(gp::GridapProblem{Tres, Tjac, Nothing})(u, p, du1, du2) where {Tres, Tjac} = _d2F_fd(gp, u, p, du1, du2)
+(gp::GridapProblem{Tres, Tjac, BK.FiniteDifferences})(u, p, du1, du2) where {Tres, Tjac} = _d2F_fd(gp, u, p, du1, du2)
+(gp::GridapProblem{Tres, Tjac, BK.AutoDiff})(u, p, du1, du2) where {Tres, Tjac} = _d2F_ad(gp, u, p, du1, du2)
+
+(gp::GridapProblem{Tres, Tjac, Td2res, Nothing})(u, p, du1, du2, du3) where {Tres, Tjac, Td2res} = _d3F_fd(gp, u, p, du1, du2, du3)
+(gp::GridapProblem{Tres, Tjac, Td2res, BK.FiniteDifferences})(u, p, du1, du2, du3) where {Tres, Tjac, Td2res} = _d3F_fd(gp, u, p, du1, du2, du3)
+(gp::GridapProblem{Tres, Tjac, Td2res, BK.AutoDiff})(u, p, du1, du2, du3) where {Tres, Tjac, Td2res} = _d3F_ad(gp, u, p, du1, du2, du3)
 
 mass_default(u,v,dΩ) = ∫(u⋅v) * dΩ
 
@@ -263,8 +306,15 @@ differential-algebraic systems. It can be passed to `BifurcationKit.solve`,
 
 # Keyword arguments
 - `jac(u, p, du, v)`: analytical jacobian. If `nothing`, it is computed by finite differences.
-- `d2res(u, p, du1, du2, v)`, `d3res(u, p, du1, du2, du3, v)`: second and third derivatives,
-  required for automatic branch switching with a non-simple kernel.
+- `d2res`, `d3res`: second and third derivatives of the residual (used by `d2F`/`d3F`,
+  *e.g.* for automatic branch switching with a non-simple kernel). Three flavours
+  are accepted:
+  * an analytic Gridap weak form `d2res(u, p, du1, du2, v)` /
+    `d3res(u, p, du1, du2, du3, v)`, assembled like `res`;
+  * `BifurcationKit.FiniteDifferences()` (or `nothing`, the default): finite
+    differences (`central_fdm`);
+  * `BifurcationKit.AutoDiff()`: ForwardDiff applied to the assembled residual
+    (note: the `jacobian` operator itself is not differentiated).
 - `mass`: the mass operator. It can be
   * `nothing`: the default L² mass `∫(u⋅v)*dΩ` (`MassDefaut`);
   * `mass(u, v)`: a constant, state-independent integrand (`ConstMass`), *e.g.*
