@@ -19,6 +19,14 @@ _is_constant_mass(::MassDefaut) = true
 _is_constant_mass(::ConstMass) = true
 _is_constant_mass(::SDMass) = false
 
+# Analytic parameter-derivative forms. A `R01`/`R02` residual-like form has
+# signature `(u, p, v)` (callable + 3 args = `nargs == 4`); a `R11` jacobian-like
+# form has signature `(u, p, du, v)` (callable + 4 args = `nargs == 5`). Anything
+# else (BifurcationKit sentinels `FiniteDifferences()`/`AutoDiff()`, `nothing`, or
+# an already assembled `(x, p) -> Vector` closure) is forwarded untouched.
+_is_residual_form(f) = f isa Function && any(m -> m.nargs == 4, methods(f))
+_is_jac_form(f)      = f isa Function && any(m -> m.nargs == 5, methods(f))
+
 """
     GridapProblem(res, jac, d2res, d3res, V, U, ls, dΩ, mass, mass_type)
 
@@ -116,6 +124,22 @@ function jacobian(gp::GridapProblem, u, p)
     return Gridap.FESpaces.jacobian(algop, u)
 end
 
+# assemble an analytic parameter-derivative residual form `form(u, p, v)` into a
+# free dof vector (same convention as `residual(gp, u, p)`)
+function _residual_from_form(gp::GridapProblem, form, x, p)
+    op   = FEOperator((u, v) -> form(u, p, v), gp.U, gp.V)
+    alop = Gridap.FESpaces.get_algebraic_operator(op)
+    return Gridap.FESpaces.residual(alop, x)
+end
+
+# assemble an analytic parameter-derivative jacobian form `form(u, p, du, v)` and
+# apply it to `dx` (used for `R11`)
+function _apply_from_biform(gp::GridapProblem, form, x, p, dx)
+    uh = FEFunction(gp.U, x)
+    A  = Gridap.FESpaces.assemble_matrix((du, v) -> form(uh, p, du, v), gp.U, gp.V)
+    return A * dx
+end
+
 # second derivative
 function (gp::GridapProblem)(u, p, du1, du2)
     du1h = FEFunction(gp.U, du1)
@@ -204,7 +228,7 @@ _get_mass_matrix(::MassDefaut, gp::GridapProblem, x, p, dΩ) =
     _get_mass_matrix(MassDefaut(), gp, dΩ)
 
 _get_mass_matrix(::ConstMass, gp::GridapProblem, x, p, dΩ) =
-    _get_mass_matrix(ConstMass(), gp, gp.mass, dΩ)
+    _assemble_mass_matrix(gp, gp.mass)
 
 function _get_mass_matrix(::SDMass, gp::GridapProblem, x, p, dΩ)
     uh = FEFunction(gp.U, x)
@@ -248,8 +272,20 @@ differential-algebraic systems. It can be passed to `BifurcationKit.solve`,
   * `mass(u, p, du, v)`: a state-dependent operator `M(x, p)` (`SDMass`), where
     `u` is the current state, `du` the trial function and `v` is the test function.
   See [`get_mass_matrix`](@ref).
-- `record_from_solution`, `plot_solution`, `R01`, `R02`, `R11`, `delta`: see the
-  `BifurcationKit` documentation.
+- `record_from_solution`, `plot_solution`, `delta`: see the `BifurcationKit`
+  documentation.
+- `R01`, `R02`, `R11`: parameter-derivative operators. In addition to the
+  `BifurcationKit` sentinels (`FiniteDifferences()`, `AutoDiff()`, `nothing`) and to
+  an already assembled closure `(x, p) -> Vector`, they accept **analytic** Gridap
+  weak forms, which are assembled automatically with the same convention as `res`
+  and `jac`:
+  * `R01(u, p, v)`, `R02(u, p, v)`: residual-like forms (return a
+    `DomainContribution`), assembled into the free dof vector `∂_p F` (resp.
+    `∂²_p F`);
+  * `R11(u, p, du, v)`: jacobian-like form, assembled into the matrix `∂_p J` and
+    applied to the direction `dx`.
+  In these closures, `p` is the **full parameter `NamedTuple`** (`p.λ`, ...), *not*
+  the scalar value of the continuation parameter.
 
 # Extended methods
 - [`get_mass_matrix`](@ref) assembles the mass matrix associated to `mass`.
@@ -295,8 +331,14 @@ function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
                 kwargs_jet...)
     jacFE =  autodiff ? nothing : jac
     probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing, dΩ, mass, _mass_type(mass))
+    # analytic parameter-derivative forms (if provided) are assembled on the fly,
+    # with the same convention as `res`/`jac`; BifurcationKit sentinels and
+    # already assembled `(x, p) -> Vector` closures are forwarded untouched.
+    R01jet = _is_residual_form(R01) ? ((x, p)     -> _residual_from_form(probFE, R01, x, p)) : R01
+    R02jet = _is_residual_form(R02) ? ((x, p)     -> _residual_from_form(probFE, R02, x, p)) : R02
+    R11jet = _is_jac_form(R11)      ? ((x, p, dx) -> _apply_from_biform(probFE, R11, x, p, dx)) : R11
     # type unstable but simplifies the types a lot
-    jet = BK.Jet(; δ = delta, R01, R02, R11, kwargs_jet...)
+    jet = BK.Jet(; δ = delta, R01 = R01jet, R02 = R02jet, R11 = R11jet, kwargs_jet...)
     return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plot_solution, record_from_solution, delta, jet)
 end
 
@@ -306,7 +348,18 @@ BifurcationKit.isinplace(::GridapBifProblem) = false
 BifurcationKit.residual(pb::GridapBifProblem, u, p) = residual(pb.probFE, u, p)
 BifurcationKit.jacobian(pb::GridapBifProblem, u, p) = jacobian(pb.probFE, u, p)
 BifurcationKit.dF(pb::GridapBifProblem, u, p, dx) = BifurcationKit.apply(BifurcationKit.jacobian(pb, u, p), dx)
-BifurcationKit.d2F(pb::GridapBifProblem, u, p, dx1, dx2) = pb.probFE(u, p, dx1, dx2)
+
+BifurcationKit.d2F(pb::GridapBifProblem, u, p, dx1::AbstractArray{<:Real}, dx2::AbstractArray{<:Real}) = pb.probFE(u, p, dx1, dx2)
+function BifurcationKit.d2F(pb::GridapBifProblem, x, p, dx1, dx2)
+    probFE = pb.probFE
+    dx1r = real.(dx1); dx2r = real.(dx2)
+    dx1i = imag.(dx1); dx2i = imag.(dx2)
+    return probFE(x, p, dx1r, dx2r) .- 
+           probFE(x, p, dx1i, dx2i) .+ 
+           im .* (probFE(x, p, dx1r, dx2i) .+ 
+                  probFE(x, p, dx1i, dx2r))
+end
+
 BifurcationKit.d3F(pb::GridapBifProblem, u, p, dx1, dx2, dx3) = pb.probFE(u, p, dx1, dx2, dx3)
 BifurcationKit.is_symmetric(::GridapBifProblem) = false
 BifurcationKit.has_adjoint(::GridapBifProblem) = false

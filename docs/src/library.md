@@ -22,6 +22,10 @@ GridapBifProblem
 ```
 
 ```@docs
+GridapBifurcationKit.GridapProblem
+```
+
+```@docs
 GridapBifurcationKit.get_mass_matrix
 ```
 
