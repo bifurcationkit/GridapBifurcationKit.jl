@@ -1,5 +1,23 @@
+# Mass operator flavours. `mass_type` is inferred from the `mass` keyword of
+# `GridapBifProblem` and drives `get_mass_matrix` dispatch:
+#   * `MassDefaut()`: no mass given, use the L² mass ∫(u⋅v)dΩ;
+#   * `ConstMass()` : a constant (state-independent) integrand `mass(u, v)`;
+#   * `SDMass()`    : a state-dependent operator `mass(u, p, du, v)`, i.e. M(x, p).
+abstract type AbstractMassType end
+struct MassDefaut <: AbstractMassType end
+struct ConstMass <: AbstractMassType end
+struct SDMass <: AbstractMassType end
 
-struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls, TOm, Tm}
+# infer the mass type from a user-provided `mass` keyword: a 4-argument method
+# `mass(u, p, du, v)` is reported by `methods` as `nargs == 5` (callable + 4).
+_mass_type(::Nothing) = MassDefaut()
+_mass_type(mass) = any(m -> m.nargs == 5, methods(mass)) ? SDMass() : ConstMass()
+
+_is_constant_mass(::MassDefaut) = true
+_is_constant_mass(::ConstMass) = true
+_is_constant_mass(::SDMass) = false
+
+struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls, TOm, Tm, Tmt}
     res::Tres        # res(u, p, v),                 residual
     jac::Tjac        # jac(u, p, du, v),             jacobian
     d2res::Td2res    # d2res(u, du1, du2, v)
@@ -9,6 +27,7 @@ struct GridapProblem{Tres, Tjac, Td2res, Td3res, TV, TU, Tls, TOm, Tm}
     ls::Tls
     dΩ::TOm
     mass::Tm
+    mass_type::Tmt
 end
 
 # rebuild a gridap operator for each parameter value
@@ -77,30 +96,66 @@ end
 
 mass_default(u,v,dΩ) = ∫(u⋅v) * dΩ
 
+# shared assembly of a (bi)linear mass integrand over the free dofs
+function _assemble_mass_matrix(prob::GridapProblem, integrand)
+    (;U, V) = prob
+    v = get_fe_basis(V)
+    u = get_trial_fe_basis(U)
+    assemblytuple = Gridap.FESpaces.collect_cell_matrix(U,V,integrand(u,v))
+    cell_matrix_MM   = collect(assemblytuple[1][1]) # This result is no longer a LazyArray
+    newassemblytuple = ([cell_matrix_MM], assemblytuple[2], assemblytuple[3])
+    a = SparseMatrixAssembler(U, V)
+    return assemble_matrix(a, newassemblytuple)
+end
+
 """
-    get_mass_matrix(prob::GridapBifProblem)
-    get_mass_matrix(prob::GridapProblem, dΩ = prob.dΩ)
+    get_mass_matrix(prob::GridapBifProblem[, x, p])
+    get_mass_matrix(prob::GridapProblem[, x, p], dΩ = prob.dΩ)
 
 Assemble the (sparse) mass matrix associated to the problem, on the free dofs of the
 trial/test spaces (Dirichlet dofs are eliminated, consistently with the jacobian).
 
-The integrand is the one passed to `GridapBifProblem(...; mass = ...)`, defaulting to the
-L² mass `∫(u⋅v)*dΩ`. For an incompressible flow, a typical choice is the *velocity only*
-mass `(u,p),(v,q) -> ∫(v⊙u)*dΩ`, which yields a singular mass matrix with a zero pressure
-block, as required for the stability of the differential-algebraic system
-``M\\dot z = F(z, p)``.
+The operator is selected by `prob.mass_type`, itself inferred from the `mass`
+keyword of [`GridapBifProblem`](@ref):
+
+* `MassDefaut()`: no mass given, use the L² mass `∫(u⋅v)*dΩ`;
+* `ConstMass()` : the constant (state-independent) integrand `mass(u, v)`;
+* `SDMass()`    : the state-dependent operator `mass(u, p, du, v)`, reconstructed
+  from the free dof vector `x` (i.e. `M(x, p)`); the `(prob, x, p)` methods must
+  be used.
+
+For an incompressible flow, a typical constant choice is the *velocity only*
+mass `(u,p),(v,q) -> ∫(v⊙u)*dΩ`, which yields a singular mass matrix with a zero
+pressure block, as required for the stability of the differential-algebraic
+system ``M\\dot z = F(z, p)``.
 """
 function get_mass_matrix(prob::GridapProblem, dΩ = prob.dΩ)
-    (;U, V) = prob
-    mm = isnothing(prob.mass) ? (u,v) -> mass_default(u,v,dΩ) : prob.mass
-    v = get_fe_basis(V)
-    u = get_trial_fe_basis(U)
-    assemblytuple = Gridap.FESpaces.collect_cell_matrix(U,V,mm(u,v))
-    cell_matrix_MM   = collect(assemblytuple[1][1]) # This result is no longer a LazyArray
-    newassemblytuple = ([cell_matrix_MM], assemblytuple[2], assemblytuple[3])
-    a = SparseMatrixAssembler(U, V)
-    L2MM = assemble_matrix(a, newassemblytuple)
-    return L2MM
+    return _get_mass_matrix(prob.mass_type, prob, dΩ)
+end
+
+_get_mass_matrix(::MassDefaut, prob::GridapProblem, dΩ) =
+    _assemble_mass_matrix(prob, (u, v) -> mass_default(u, v, dΩ))
+
+_get_mass_matrix(::ConstMass, prob::GridapProblem, dΩ) =
+    _assemble_mass_matrix(prob, prob.mass)
+
+function _get_mass_matrix(::SDMass, prob::GridapProblem, dΩ)
+    throw(ArgumentError("The mass operator passed to `GridapBifProblem` is state-dependent; call `get_mass_matrix(prob, x, p)` with the state `x` and parameters `p`."))
+end
+
+function get_mass_matrix(prob::GridapProblem, x, p, dΩ = prob.dΩ)
+    return _get_mass_matrix(prob.mass_type, prob, x, p, dΩ)
+end
+
+_get_mass_matrix(::MassDefaut, prob::GridapProblem, x, p, dΩ) =
+    _assemble_mass_matrix(prob, (u, v) -> mass_default(u, v, dΩ))
+
+_get_mass_matrix(::ConstMass, prob::GridapProblem, x, p, dΩ) =
+    _assemble_mass_matrix(prob, prob.mass)
+
+function _get_mass_matrix(::SDMass, prob::GridapProblem, x, p, dΩ)
+    uh = FEFunction(prob.U, x)
+    return _assemble_mass_matrix(prob, (u, v) -> prob.mass(uh, p, u, v))
 end
 ################################################################################
 # structure to help casting the functional in a way that BifurcationKit can use
@@ -126,8 +181,13 @@ used for the stability analysis, *e.g.* for Hopf bifurcations.
 - `jac(u, p, du, v)`: analytical jacobian. If `nothing`, it is computed by finite differences.
 - `d2res(u, p, du1, du2, v)`, `d3res(u, p, du1, du2, du3, v)`: second and third derivatives,
   required for automatic branch switching with a non-simple kernel.
-- `mass(u, v)`: integrand of the mass matrix, *e.g.* `(u,v) -> ∫(u⋅v)*dΩ`. If `nothing`,
-  the default L² mass `∫(u⋅v)*dΩ` is used (see [`get_mass_matrix`](@ref)).
+- `mass`: the mass operator. It can be
+  * `nothing`: the default L² mass `∫(u⋅v)*dΩ` (`MassDefaut`);
+  * `mass(u, v)`: a constant, state-independent integrand (`ConstMass`), *e.g.*
+    `(u,v) -> ∫(u⋅v)*dΩ`;
+  * `mass(u, p, du, v)`: a state-dependent operator `M(x, p)` (`SDMass`), where
+    `u` is the current state and `du` the trial function.
+  See [`get_mass_matrix`](@ref).
 - `record_from_solution`, `plot_solution`, `R01`, `R02`, `R11`, `delta`: see the
   `BifurcationKit` documentation.
 
@@ -188,13 +248,14 @@ function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
                 mass = nothing,
                 kwargs_jet...)
     jacFE =  autodiff ? nothing : jac
-    probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing, dΩ, mass)
+    probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing, dΩ, mass, _mass_type(mass))
     # type unstable but simplifies the types a lot
     jet = BK.Jet(; δ = delta, R01, R02, R11, kwargs_jet...)
     return GridapBifProblem(probFE, Gridap.get_free_dof_values(u0), parms, lens, plot_solution, record_from_solution, delta, jet)
 end
 
 get_mass_matrix(prob::GridapBifProblem) = get_mass_matrix(prob.probFE)
+get_mass_matrix(prob::GridapBifProblem, x, p) = get_mass_matrix(prob.probFE, x, p)
 BK.has_hessian(prob::GridapBifProblem) = BK.has_hessian(prob.VF)
 
 BK.R01(prob::GridapBifProblem, x, p) = BK.R01(BK.has_R01_trait(prob.jet), prob, x, p)
@@ -205,5 +266,5 @@ BK.R02(::BK.TraitUserPassed, prob::GridapBifProblem, x, p) = prob.jet.R02(x, p)
 BK.R11(prob::GridapBifProblem, x, p, dx) = BK.R11(BK.has_R11_trait(prob.jet), prob, x, p, dx)
 BK.R11(::BK.TraitUserPassed, prob::GridapBifProblem, x, p, dx) = prob.jet.R11(x, p, dx)
 
-BK.is_mass_matrix_constant(::GridapBifProblem) = true
-BK.getmassmatrix(prob::GridapBifProblem, x, p) = get_mass_matrix(prob)
+BK.is_mass_matrix_constant(prob::GridapBifProblem) = _is_constant_mass(prob.probFE.mass_type)
+BK.getmassmatrix(prob::GridapBifProblem, x, p) = get_mass_matrix(prob.probFE, x, p)

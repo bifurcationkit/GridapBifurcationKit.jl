@@ -87,6 +87,8 @@ plotsol(sol; k...) = (plot();plotsol!(sol; k...))
 ####################################################################################################
 using Statistics
 
+const w = rand(length(BK.getu0(prob))÷2)
+
 recordSolSCH(x, p; k...) = (
             # u0 = reshape(x[1:length(x)÷2],Nx,Ny)[Nx÷2,Ny÷2],
             u0 = x[length(x)÷4],
@@ -94,6 +96,7 @@ recordSolSCH(x, p; k...) = (
             max = maximum(x[1:length(x)÷2]),
             min = minimum(x[1:length(x)÷2]),
             zero = maximum(x[1:length(x)÷2]) - p,
+            x = norm(x[1:length(x)÷2] .* w) - p * norm(w),
             norminf = norm(x[1:length(x)÷2], Inf))
 
 prob = GridapBifProblem(res, uh, par_sh, Y, X, dΩ, (@optic _.λ);
@@ -116,7 +119,7 @@ sol = @time BK.solve(prob, Newton(), NewtonPar(optn; verbose = true, tol=1e-11))
 opts = ContinuationPar(dsmin = 0.001, dsmax = 0.01, ds = -0.01, p_max = 3.5, p_min= 2., detect_bifurcation = 3, nev = 30, newton_options = NewtonPar(optn; verbose = false, tol = 1e-11), max_steps = 100, tol_stability = 1e-7, n_inversion = 4)
 br = @time continuation(prob, PALC(tangent = Bordered()), opts;
         plot = true,
-        verbosity = 2,
+        # verbosity = 2,
     )
 
 BK.plot(br)[1]
@@ -126,12 +129,14 @@ eigenvals(br, 13) |> display
 bp = get_normal_form(br, 1; verbose = true, nev = 20, scaleζ = norminf, start_with_eigen = Val(false))
 
 br1 = @time continuation(br, 1, setproperties(br.contparams; ds = 1e-2, max_steps = 100, detect_bifurcation = 3, dsmax = 0.02, dsmin = 1e-3, plot_every_step = 5, p_min = 2.2, n_inversion = 6);
-        verbosity = 3, 
+        # verbosity = 3, 
         plot = true,
         verbosedeflation = false,
         scaleζ = norminf,
         start_with_eigen = Val(false),
         )
+
+BK.plot(br, br1...; dash_unstable_style = true, vars = (:param, :x))[1]
 
 begin
 f,ax = BK.plot(br; vars = (:param, :max),label="")

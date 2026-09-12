@@ -32,13 +32,13 @@ function plotsol!(ax, Uh::Vector, _sol, N = 50; grid_layout_perso = nothing, k..
     _sol.free_values .= Uh
     uhc = [evaluate(_sol[1], Gridap.Point(x, y)) for x in X, y in Y]
     ax.title="||u||"
-	contourf!(ax, X, Y, norm.(uhc); colormap = :bwr, levels = 10)
-	contour!(ax, X, Y, norm.(uhc); color = :black, labels = true, labelsize = 13, levels = 10)
+    contourf!(ax, X, Y, norm.(uhc); colormap = :bwr, levels = 10)
+    contour!(ax, X, Y, norm.(uhc); color = :black, labels = true, labelsize = 13, levels = 10)
 
     if isnothing(grid_layout_perso)==false
         st = streamfunction(Uh)
         ax2 = Axis(grid_layout_perso[1,2], title = "stream")
-		uhc = [evaluate(st, Gridap.Point(x, y)) for x in X, y in Y]
+        uhc = [evaluate(st, Gridap.Point(x, y)) for x in X, y in Y]
         contourf!(ax2, X, Y, uhc; colormap = :bwr, levels = 10)
         contour!(ax2, X, Y, uhc; color = :black, labels = true, labelsize = 13, levels = 10)
     end
@@ -95,7 +95,7 @@ begin
 nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())
 solver = FESolver(nls)
 
-sol = solve(solver,op) #uh, ph
+sol_gp = solve(solver,op) #uh, ph
 Nu = length(sol[1].free_values)
 
 plotsol(sol[1])
@@ -179,19 +179,15 @@ br = @time continuation(prob,
 
 BK.plot(br)[1]
 
-_J = BifurcationKit.jacobian(prob, soln.u, par_lid)
-ind = 70
-_J = prob(Val(:Jac), br.sol[ind].x, @set par_lid.Re = br.sol[ind].p)
-println("\n\n--> parameter = ", br.sol[ind].p)
-# _eigs = optn.eigsolver(-_J, 10)
+BK.get_normal_form(br, 1; start_with_eigen = Val(false),
+					bls = BorderingBLS(optn.linsolver),
+					)
 
-_λs, _vps = @time optn.eigsolver(_J,10)
-_λs, _vps = @time BifurcationKit.gev(optn.eigsolver,_J,M0,10)
+_x = soln.u; _par = par_lid
+_ind = 2;_x = br.specialpoint[_ind].x;_par = @set par_lid.Re = br.specialpoint[_ind].param
+_J = @time BifurcationKit.jacobian(prob, _x, _par)
+_M = BK.getmassmatrix(prob,1,1)
+λs, Xv, = BK.gev(eig, _J, _M, 200); λs
 
-
-br.sol[30].p
-
-
-_J = prob(Val(:Jac), soln, par_lid)
-
-_J+_J'
+# empty!(ax);plotsol!(ax, _x, uh, N = 50;);f
+norm(_J * Xv - _M * Xv * Diagonal(λs), Inf)

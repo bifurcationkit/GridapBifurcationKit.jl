@@ -3,12 +3,13 @@ using Pkg
 pkg"activate ."
 
 using Revise
-using Plots, Gridap, SparseArrays#, Arpack
+using CairoMakie, Gridap, SparseArrays#, Arpack
 import BifurcationKit as BK
-# using KrylovKit
 using LinearAlgebra
 using Gridap.FESpaces
 using GridapBifurcationKit
+
+Makie.inline!(true)
 #############################################
 # discretisation
 begin
@@ -54,18 +55,18 @@ end
 uh = zero(X)
 uh.free_values .= 2
 ####################################################################################################
-function plotsol!(X; nd = 60, k...)
-    sol = X isa BK.BorderedArray ? X.u : X
-
-    Plots.plot!(sol; k...)
+function plotsol!(ax, X; nd = 60, k...)
+    sol = X
+    lines!(ax, sol; k...)
+    ax
 end
-plotsol2!(sol::Vector; k...) = (_uh = zero(X); _uh.free_values .= sol; plotsol!(_uh; k...))
-plotsol2(sol; k...) = (plot();plotsol2!(sol; k...))
-plotsol(sol; k...) = (plot();plotsol!(sol; k...))
+plotsol2!(ax, sol::Vector; k...) = (_uh = zero(X); _uh.free_values .= sol; plotsol!(ax, _uh; k...))
+plotsol2(sol; k...) = (f=Figure();plotsol2!(Axis(f[1,1]), sol; k...))
+plotsol(sol; k...) = (f=Figure();plotsol!(Axis(f[1,1])sol; k...))
 ####################################################################################################
 using Statistics
 
-recordSolSCH(x, p;k...) = (
+recordSolSCH(x, p; k...) = (
             # u0 = reshape(x[1:length(x)÷2],Nx,Ny)[Nx÷2,Ny÷2],
             u0 = x[length(x)÷4],
             nrm =  norm(x[1:length(x)÷2], Inf),
@@ -76,7 +77,7 @@ recordSolSCH(x, p;k...) = (
 
 prob = GridapBifProblem(res, uh, par_sh, Y, X, dΩ, (BK.@optic _.l);
             jac = jac,
-            plot_solution = (x,p;kp...) -> plotsol!(x; kp...),
+            plot_solution = (ax,x,p;ax1,iter,state,kp...) -> plotsol!(ax,x; kp...),
             record_from_solution = recordSolSCH,
             # record_from_solution = (x, p) -> norm(x[1:length(x)÷2] .- p, 8),
             )
@@ -97,8 +98,8 @@ br = @time BK.continuation(prob,
         # verbosity = 2,
     )
 
-plot(br)
-plot(sol.u)
+BK.plot(br)[1]
+lines(sol.u)
 
 hopfpt = BK.get_normal_form(br, 1; verbose = true, scaleζ = BK.norminf, start_with_eigen = Val(false))
 # ──▶ Hopf bifurcation point is: SuperCritical
@@ -127,10 +128,10 @@ br_hopf = BK.continuation(br, ind_hopf, (BK.@optic _.β),
     start_with_eigen = false,
     jacobian_ma = BK.MinAug(), # specific to large dimensions
     usehessian = false,
-    plot = true,
+    # plot = true,
     normC = BK.norminf)
 
-scene = plot(br_hopf)
+BK.plot(br_hopf)[1]
 ####################################################################################################
 # automatic branch switching from Hopf point
 opt_po = BK.NewtonPar(tol = 1e-8, verbose = true, max_iterations = 15)
@@ -166,10 +167,69 @@ br_po = BK._continuation(
     verbosity = 3, plot = true,
     # arguments for continuation
     δp = 0.01,
-    plot_solution = (x, p; kwargs...) -> begin
+    plot_solution = (ax, x, p; ax1, kwargs...) -> begin
         _sol = BK.get_periodic_orbit(probFD, x, p.p)
-        heatmap!(_sol.u'; ylabel="time", color=:viridis, kwargs...)
+        ax.ylabel="time"
+        heatmap!(ax, _sol.u; colormap=:viridis)
     end,
     normC = BK.norminf)
 
 plot(br_po)
+
+####################################################################################################
+# Transient simulation with TransientFEOperator
+# ∂ₜu = D1/l² Δu + u²v - (β+1)u + α
+# ∂ₜv = D2/l² Δv + βu - u²v
+# i.e. we solve   ∫(∂ₜu⋅V1 + ∂ₜv⋅V2)dΩ - res((u,v), p, (V1,V2)) = 0
+#
+# The Hopf bifurcation of the steady branch is at l ≈ 0.513 (see continuation above).
+# For l > 0.513 the steady state is unstable and a limit cycle develops: e.g. l = 0.6.
+function simulate(p = (; par_sh..., l = 0.6);
+                  Δt = 0.01, tF = 60.0, θ = 0.5, amp = 1e-1,
+                  plot_every = 50, plot = true)
+    # trial/test spaces for this parameter set (Dirichlet data depend on p)
+    Xp = MultiFieldFESpace([TrialFESpace(V0, p.α), TrialFESpace(V0, p.β / p.α)])
+
+    # steady state at p, then small deterministic perturbation of the free dofs
+    op_FE = FEOperator((x, v) -> res(x, p, v),
+                       (x, dx, v) -> jac(x, p, dx, v), Xp, Y)
+    nls0  = NLSolver(LUSolver(); method = :newton, show_trace = false)
+    x0    = solve(FESolver(nls0), op_FE)
+    x0.free_values .+= amp .* sin.(0.7362 .* (1:length(x0.free_values)))
+
+    # transient residual and jacobians: res(t, u, v), jac = ∂res/∂u, jac_t = ∂res/∂(∂ₜu)
+    res_t(t, (u, v), (V1, V2)) = ∫( ∂t(u) ⋅ V1 + ∂t(v) ⋅ V2 )dΩ - res((u, v), p, (V1, V2))
+    jac_x(t, (u, v), (du, dv), (V1, V2)) = (-1) * jac((u, v), p, (du, dv), (V1, V2))
+    jac_t(t, (u, v), (du, dv), (V1, V2)) = ∫( du ⋅ V1 + dv ⋅ V2 )dΩ
+
+    op_t     = TransientFEOperator(res_t, (jac_x, jac_t), Xp, Y)
+    solver_t = ThetaMethod(nls0, Δt, θ) # better for stiff Brusselator
+    # solver_t =  RungeKutta(nls0, Δt, :EXRK_RungeKutta_4_4)
+    sol_t    = solve(solver_t, op_t, 0.0, tF, x0)
+
+    if plot
+        fig = Figure()
+        ax  = Axis(fig[1, 1], title = "solution")
+        ylims!(ax, (0,4))
+        axm = Axis(fig[1, 2], xlabel = "t", ylabel = "max")
+        ts   = Float64[]
+        maxs = Float64[]
+        for (n, (tn, uhn)) in enumerate(sol_t)
+            x = get_free_dof_values(uhn)
+            push!(ts, tn)
+            push!(maxs, maximum(x[1:length(x) ÷ 2]))
+            n % plot_every == 0 || continue
+            empty!(ax)
+            plotsol!(ax, x[1:length(x) ÷ 2])
+            ax.title = "t = $(round(tn; digits = 2))"
+            empty!(axm)
+            lines!(axm, ts, maxs)
+            display(fig)
+        end
+    end
+    return sol_t
+end
+
+sol_ev = simulate((; par_sh..., l = 1.8); Δt = 0.01, tF = 220.0, plot_every = 30)
+
+####################################################################################################
