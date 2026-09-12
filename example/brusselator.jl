@@ -114,7 +114,7 @@ hopfpt = BK.get_normal_form(br, 1; verbose = true, scaleζ = BK.norminf, start_w
 ind_hopf = 1
 
 # newton iterations to compute the Hopf point
-hopfpoint = BK.newton(br, ind_hopf; options = BK.NewtonPar(verbose=true, tol=1e-10), normN = BK.norminf, usehessian = false)
+hopfpoint = BK.newton(br, ind_hopf; options = BK.NewtonPar(verbose=true, tol=1e-10), normN = BK.norminf, usehessian = true, start_with_eigen  = false, jacobian_ma = BK.MinAug())
 hopfpoint.u.p
 
 optcdim2 = BK.ContinuationPar(dsmin = 0.001, dsmax = 0.05, ds= 0.01, p_max = 6.5, p_min = 0.0, newton_options = opts.newton_options, detect_bifurcation = 0)

@@ -41,6 +41,45 @@ using BifurcationKit
     fd = (BifurcationKit.residual(prob, x + ϵ * dx, par) - r) / ϵ
     @test fd ≈ BifurcationKit.dF(prob, x, par, dx) rtol = 1e-5
 
+    @testset "jacobian_type" begin
+        J_ref = BifurcationKit.jacobian(prob, x, par)
+
+        # FullSparse (default): a fresh sparse matrix is assembled at each call
+        prob_fs = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ); jac = jac)
+        @test prob_fs.jacobianType == BifurcationKit.FullSparse()
+        @test BifurcationKit.jacobian(prob_fs, x, par) ≈ J_ref
+        @test BifurcationKit.jacobian(prob_fs, x, par) !==
+              BifurcationKit.jacobian(prob_fs, x, par)
+
+        # FullSparseInplace: the matrix preallocated at construction is reused
+        # and updated in place (same object returned across calls)
+        prob_inplace = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
+                                        jac = jac,
+                                        jacobian_type = BifurcationKit.FullSparseInplace())
+        @test prob_inplace.jacobianType == BifurcationKit.FullSparseInplace()
+        J1 = BifurcationKit.jacobian(prob_inplace, x, par)
+        @test J1 ≈ J_ref
+        J2 = BifurcationKit.jacobian(prob_inplace, x + 0.1 * dx, par)
+        @test J1 === J2
+        @test J2 ≈ BifurcationKit.jacobian(prob_fs, x + 0.1 * dx, par)
+
+        # MatrixFree: `jacobian` returns a closure computing the jvp, no matrix
+        prob_mf = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
+                                   jac = jac,
+                                   jacobian_type = BifurcationKit.MatrixFree())
+        @test prob_mf.jacobianType == BifurcationKit.MatrixFree()
+        Jmf = BifurcationKit.jacobian(prob_mf, x, par)
+        @test Jmf isa Function
+        @test Jmf(dx) ≈ J_ref * dx
+        @test BifurcationKit.dF(prob_mf, x, par, dx) ≈ J_ref * dx
+
+        # unsupported jacobian kind is rejected at evaluation time
+        prob_bad = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
+                                    jac = jac,
+                                    jacobian_type = BifurcationKit.FiniteDifferences())
+        @test_throws ArgumentError BifurcationKit.jacobian(prob_bad, x, par)
+    end
+
     @testset "mass interface" begin
         # 1. MassDefaut: no `mass` keyword, L² mass ∫(u⋅v)dΩ
         M = GridapBifurcationKit.get_mass_matrix(prob)

@@ -140,9 +140,11 @@ BK.plot(br, br1...; dash_unstable_style = true, vars = (:param, :x))[1]
 
 begin
 f,ax = BK.plot(br; vars = (:param, :max),label="")
-for b in br1
-    BK.plot!(ax, b; vars = (:param, :max),label="")
-    BK.plot!(ax, b; vars = (:param, :min),label="")
+cols = Makie.wong_colors()
+for (i, b) in enumerate(br1)
+    c = cols[mod1(i + 1, length(cols))]
+    BK.plot!(ax, b; vars = (:param, :max), branchcolor = c, label="", )
+    BK.plot!(ax, b; vars = (:param, :min), branchcolor = c, label="", )
 end
 
 xlims!(ax,(2.25,3.4))
