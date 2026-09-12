@@ -1,6 +1,7 @@
 module GridapBifurcationKit
 	using Gridap, BifurcationKit
 	using FiniteDifferences
+	using ForwardDiff
 	const BK = BifurcationKit
 
 	include("Wrap.jl")

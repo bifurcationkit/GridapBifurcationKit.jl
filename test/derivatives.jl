@@ -95,9 +95,15 @@ end
     jac((u, p), par, (du, dp), (v, q)) = ∫(∇(du) ⊙ ∇(v) + du ⋅ v +
                                            2 * (u ⋅ du) * (u ⋅ v) + (u ⋅ u) * (du ⋅ v) +
                                            dp * (∇ ⋅ v) + q * (∇ ⋅ du)) * dΩ
+    d2res((u, p), par, (a, dpa), (b, dpb), (v, q)) =
+        ∫(2 * ((a ⋅ b) * (u ⋅ v) + (u ⋅ a) * (b ⋅ v) + (u ⋅ b) * (a ⋅ v))) * dΩ
+    d3res((u, p), par, (a, dpa), (b, dpb), (c, dpc), (v, q)) =
+        ∫(2 * ((a ⋅ b) * (c ⋅ v) + (a ⋅ c) * (b ⋅ v) + (b ⋅ c) * (a ⋅ v))) * dΩ
 
     uh = zero(X)
     par = (λ = 1.0,)
+    prob_an = GridapBifProblem(res, uh, par, Y, X, dΩ, (@optic _.λ);
+                               jac = jac, d2res = d2res, d3res = d3res)
     prob_ad = GridapBifProblem(res, uh, par, Y, X, dΩ, (@optic _.λ);
                                jac = jac,
                                d2res = BifurcationKit.AutoDiff(),
@@ -113,12 +119,20 @@ end
     du2 = collect(range(0.6, 1.1, length = m))
     du3 = collect(range(-1.0, -0.2, length = m))
 
+    v2_an = prob_an.probFE(x, par, du1, du2)
     v2_ad = prob_ad.probFE(x, par, du1, du2)
     v2_fd = prob_fd.probFE(x, par, du1, du2)
+    v3_an = prob_an.probFE(x, par, du1, du2, du3)
     v3_ad = prob_ad.probFE(x, par, du1, du2, du3)
     v3_fd = prob_fd.probFE(x, par, du1, du2, du3)
 
-    @test norm(v2_ad) > 0
+    @test norm(v2_an) > 0
+    @test norm(v3_an) > 0
+    # with non-zero Dirichlet data, the analytic directions must be homogeneous
+    @test v2_ad ≈ v2_an rtol = 1e-6
+    @test v3_ad ≈ v3_an rtol = 1e-5
+    @test v2_fd ≈ v2_an rtol = 1e-5
+    @test v3_fd ≈ v3_an rtol = 1e-4
     @test v2_ad ≈ v2_fd rtol = 1e-6
     @test v3_ad ≈ v3_fd rtol = 1e-4
 end

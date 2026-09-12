@@ -75,5 +75,78 @@ using BifurcationKit
         M1 = GridapBifurcationKit.get_mass_matrix(prob_sd, x1, par)
         @test norm(M1 - M) > 0
         @test BifurcationKit.getmassmatrix(prob_sd, x1, par) ≈ M1
+
+        @testset "mass derivatives (minimally augmented Hopf)" begin
+            m = length(x1)
+            v = collect(range(1.0, 2.0, length = m)); v ./= norm(v)
+            w = collect(range(-0.5, 0.5, length = m)); w ./= norm(w)
+
+            # ∇_x ⟨w, M(x, p) v⟩ by AutoDiff vs central finite differences
+            g_ad = BifurcationKit.∇_x_mass_matrix(prob_sd, x1, par, v, w)
+            g_fd = similar(g_ad)
+            ϵ = 1e-6
+            for i in eachindex(x1)
+                ei = zero(x1); ei[i] = ϵ
+                Mp = BifurcationKit.getmassmatrix(prob_sd, x1 + ei, par)
+                Mm = BifurcationKit.getmassmatrix(prob_sd, x1 - ei, par)
+                g_fd[i] = (BifurcationKit.dot_with_mass(w, Mp, v) -
+                           BifurcationKit.dot_with_mass(w, Mm, v)) / (2ϵ)
+            end
+            @test g_ad ≈ g_fd rtol = 1e-5
+
+            # ∂_p ⟨w, M(x, p) v⟩: λ-dependent SDMass, AutoDiff vs finite differences
+            mass_sdp = (u, p, du, v) -> ∫(p.λ * (1 + u * u) * du * v) * dΩ
+            prob_sdp = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
+                                        jac = jac, mass = mass_sdp)
+            d_ad = BifurcationKit.R01_mass_matrix(prob_sdp, x1, par, v, w)
+            ϵp = 1e-6
+            Mp = BifurcationKit.getmassmatrix(prob_sdp, x1, (λ = par.λ + ϵp,))
+            Mm = BifurcationKit.getmassmatrix(prob_sdp, x1, (λ = par.λ - ϵp,))
+            d_fd = (BifurcationKit.dot_with_mass(w, Mp, v) -
+                    BifurcationKit.dot_with_mass(w, Mm, v)) / (2ϵp)
+            @test d_ad ≈ d_fd rtol = 1e-5
+
+            # analytic state-derivative form `dM(u, p, du1, du2, v)` used for `∇xM`
+            dM_sd = (u, p, du1, du2, v) -> ∫(2 * u * du1 * du2 * v) * dΩ
+            prob_dM = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
+                                       jac = jac, mass = mass_sd, ∇xM = dM_sd)
+            @test BifurcationKit.∇_x_mass_matrix(prob_dM, x1, par, v, w) ≈ g_ad rtol = 1e-9
+
+            # complex directions (real / imaginary split)
+            vc = v .+ im .* reverse(v)
+            wc = w .+ im .* reverse(w)
+            @test BifurcationKit.∇_x_mass_matrix(prob_dM, x1, par, vc, wc) ≈
+                  BifurcationKit.∇_x_mass_matrix(prob_sd, x1, par, vc, wc) rtol = 1e-9
+        end
+    end
+
+    # the AutoDiff mass gradient must also work when Dirichlet dofs are present
+    # (mixing dual free dofs with Dirichlet values is rejected by Gridap).
+    @testset "state-dependent mass with Dirichlet dofs" begin
+        labels = get_face_labeling(model)
+        add_tag_from_tags!(labels, "diri", [1, 2])
+        Vd = TestFESpace(model, reffe; conformity = :H1, dirichlet_tags = ["diri"])
+        Ud = TrialFESpace(Vd, 0.0)
+
+        mass_sd = (u, p, du, v) -> ∫((1 + u * u) * du * v) * dΩ
+        prob_d = GridapBifProblem(res, zero(Ud), par, Vd, Ud, dΩ, (@optic _.λ);
+                                  jac = jac, mass = mass_sd)
+
+        md = length(get_free_dof_values(zero(Ud)))
+        xd = collect(range(0.1, 0.3, length = md))
+        v = collect(range(1.0, 2.0, length = md)); v ./= norm(v)
+        w = collect(range(-0.5, 0.5, length = md)); w ./= norm(w)
+
+        g_ad = BifurcationKit.∇_x_mass_matrix(prob_d, xd, par, v, w)
+        g_fd = similar(g_ad)
+        ϵ = 1e-6
+        for i in eachindex(xd)
+            ei = zero(xd); ei[i] = ϵ
+            Mp = BifurcationKit.getmassmatrix(prob_d, xd + ei, par)
+            Mm = BifurcationKit.getmassmatrix(prob_d, xd - ei, par)
+            g_fd[i] = (BifurcationKit.dot_with_mass(w, Mp, v) -
+                       BifurcationKit.dot_with_mass(w, Mm, v)) / (2ϵ)
+        end
+        @test g_ad ≈ g_fd rtol = 1e-5
     end
 end
