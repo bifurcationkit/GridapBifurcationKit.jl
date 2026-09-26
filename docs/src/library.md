@@ -29,6 +29,18 @@ GridapBifurcationKit.GridapProblem
 GridapBifurcationKit.get_mass_matrix
 ```
 
+```@docs
+GridapBifurcationKit.residual
+```
+
+```@docs
+GridapBifurcationKit.jacobian
+```
+
+```@docs
+GridapBifurcationKit.jacobian!
+```
+
 ## Eigen solvers
 
 The generic eigensolvers are provided by `BifurcationKit.jl` (`DefaultEig`, `EigArpack`,

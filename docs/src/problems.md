@@ -69,5 +69,5 @@ prob = GridapBifProblem(res, u0, par, V, U, dΩ, lens; jac = jac, mass = m0)
 The following `BifurcationKit` functions are specialized so that the mass matrix is
 correctly taken into account:
 
-- `BifurcationKit.is_mass_matrix_constant(prob)` returns `true`;
-- `BifurcationKit.getmassmatrix(prob, x, p)` returns [`get_mass_matrix`](@ref)`(prob)`.
+- `BifurcationKit.is_mass_matrix_constant(prob)` returns `true` for a constant mass (`nothing` or `mass(u, v)`) and `false` for a state-dependent one (`mass(u, p, du, v)`);
+- `BifurcationKit.getmassmatrix(prob, x, p)` returns [`get_mass_matrix`](@ref)`(prob, x, p)`.

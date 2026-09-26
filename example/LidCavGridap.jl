@@ -178,7 +178,7 @@ soln = @time BifurcationKit.solve(prob, Newton(), NewtonPar(optn; verbose = true
 
 # 10.1017/9781108863148 gives Hopf1 at Re = 8023, Hopf2 at Re = 8700
 # VP1 = ±2.7762im
-opts = ContinuationPar(p_max = 10000., p_min = 0.01, ds = 1., dsmax = 150., max_steps = 3000, detect_bifurcation = 0, newton_options = optn, nev = 300, tol_stability = 1e-6, n_inversion = 6, plot_every_step = 10, detect_event = 2, save_eigenvectors = false)
+opts = ContinuationPar(p_max = 10000., p_min = 0.01, ds = 1., dsmax = 150., max_steps = 3000, detect_bifurcation = 3, newton_options = optn, nev = 200, tol_stability = 1e-6, n_inversion = 6, plot_every_step = 10, detect_event = 0, save_eigenvectors = false)
 @reset opts.newton_options.verbose = true
 br = @time continuation(prob, 
         # BK.AutoSwitch(tol_param = 0.1), 

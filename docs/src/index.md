@@ -46,7 +46,7 @@ Custom state means, we can use something else than `AbstractArray`, for example 
 
 ## 🧑‍💻 Other softwares
 
-There are several good softwares already available for PDE bifurcation analysis. One can mention e.g. [`pde2path`](https://www.staff.uni-oldenburg.de/hannes.uecker/pde2path/). The present package is, to our knowledge, the only one written in Julia and leveraging automatic finite element discretization with `Gridap.jl`.
+There are several good softwares already available for PDE bifurcation analysis. One can mention e.g. [`pde2path`](https://www.staff.uni-oldenburg.de/hannes.uecker/pde2path/) and [ff-bifbox](https://github.com/cmdoug/ff-bifbox). The present package is, to our knowledge, the only one written in Julia and leveraging automatic finite element discretization with `Gridap.jl`.
 
 ## 📚 Citing this work
 

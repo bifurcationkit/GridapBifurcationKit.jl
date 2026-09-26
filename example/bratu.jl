@@ -33,10 +33,10 @@ degree = 2*order
 dΩ = Measure(Ω, degree)
 
 NL(u) = exp(u)
-res(u, p, v)     = ∫( -∇(v)⋅∇(u) -  v ⋅ (u - p.λ ⋅ (NL ∘ u)) * 10 )*dΩ
-jac(u, p, du, v) = ∫( -∇(v)⋅∇(du) - v ⋅ du ⋅ (1 - p.λ *( NL ∘ u)) * 10 )*dΩ
-d2res(u, p, du1, du2, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ (NL ∘ u) * 10 * p.λ )*dΩ
-d3res(u, p, du1, du2, du3, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ (NL ∘ u) * 10 * p.λ )*dΩ
+res(u, p, v)     = ∫( -∇(v)⋅∇(u) -  v ⋅ (u - p.λ * (NL ∘ u)) * 10 )*dΩ
+jac(u, p, du, v) = ∫( -∇(v)⋅∇(du) - v ⋅ du ⋅ (1 - p.λ * ( NL ∘ u)) * 10 )*dΩ
+d2res(u, p, du1, du2, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ (NL ∘ u) * (10 * p.λ) )*dΩ
+d3res(u, p, du1, du2, du3, v) = ∫( v ⋅ du1 ⋅ du2 ⋅ du3 ⋅ (NL ∘ u) * (10 * p.λ) )*dΩ
 
 uh = zero(U)
 par_bratu = (λ = 0.01,)
@@ -51,7 +51,7 @@ prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
                 jac = jac,
                 # d2res = d2res,
                 # d3res = d3res,
-                plot_solution = (ax, x, p; ax1 = nothing, k...) -> plotgridap!(ax, x; k...),
+                plot_solution = (ax, x, p; ax1 = nothing, iter, state, k...) -> plotgridap!(ax, x; k...),
                 record_from_solution = (x, p; k...) -> normbratu(x))
 
 # factorize leads pivots issues, better use LU factorization here
@@ -64,7 +64,7 @@ br = continuation(prob, PALC(tangent = Bordered()), opts;
     verbosity = 0,
     )
 
-plot(br)
+BifurcationKit.plot(br)[1]
 
 nf = get_normal_form(br, 2; verbose = true, scaleζ = norminf, start_with_eigen = Val(false))
 ####################################################################################################
@@ -78,7 +78,7 @@ br1 = continuation(br, 3,
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
-plot(br, br1)
+BifurcationKit.plot(br, br1)[1]
 
 br2 = continuation(br1, 2,
         ContinuationPar(BifurcationKit.getcontparams(br);ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
@@ -89,7 +89,7 @@ br2 = continuation(br1, 2,
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
-plot(br, br1, br2)
+BifurcationKit.plot(br, br1, br2)[1]
 
 br3 = continuation(br, 2,
         ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
@@ -101,5 +101,5 @@ br3 = continuation(br, 2,
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
-plot(br, br1, br2, br3...)
-plot(br, br3...)
+BifurcationKit.plot(br, br1, br2, br3...)[1]
+BifurcationKit.plot(br, br3...)

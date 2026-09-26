@@ -76,7 +76,7 @@ const Ω = Triangulation(model)
 num_cells(Ω)
 GLMakie.plot(Ω)
 GLMakie.wireframe(Ω, color=:black, linewidth=2)
-GLMakie.scatter(Ω, marker=:star8, markersize=20, color=:blue)
+GLMakie.scatter(Ω, marker=:star8, markersize=6, color=:blue)
 #############################################
 # function spaces
 begin

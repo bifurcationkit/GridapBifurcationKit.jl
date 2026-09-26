@@ -81,7 +81,7 @@ using BifurcationKit
     end
 
     @testset "mass interface" begin
-        # 1. MassDefaut: no `mass` keyword, L² mass ∫(u⋅v)dΩ
+        # 1. MassDefault: no `mass` keyword, L² mass ∫(u⋅v)dΩ
         M = GridapBifurcationKit.get_mass_matrix(prob)
         m = length(x)
         @test size(M) == (m, m)
@@ -114,6 +114,25 @@ using BifurcationKit
         M1 = GridapBifurcationKit.get_mass_matrix(prob_sd, x1, par)
         @test norm(M1 - M) > 0
         @test BifurcationKit.getmassmatrix(prob_sd, x1, par) ≈ M1
+
+        @testset "mass application (applyM)" begin
+            # default: the mass matrix is assembled and multiplied
+            @test BifurcationKit.apply_mass_matrix(prob, x, par, dx) ≈ M * dx
+            @test BifurcationKit.apply_mass_matrix(prob_c, x, par, dx) ≈ c * M * dx
+            @test BifurcationKit.apply_mass_matrix(prob_sd, x1, par, dx) ≈ M1 * dx
+            # user provided application is stored in `applyM` and used as is
+            prob_am = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
+                                       jac = jac, mass = mass_c,
+                                       applyM = (x, p, dx) -> 3 .* dx)
+            @test BifurcationKit.apply_mass_matrix(prob_am, x, par, dx) == 3 .* dx
+            @test prob_am.probFE.mass.applyM(x, par, dx) == 3 .* dx
+            # analytic weak-form application `applyM(u, p, du, v)`, assembled
+            # like `jac` and applied to `dx`
+            applyM_form = (u, p, du, v) -> ∫(c * du * v) * dΩ
+            prob_amf = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
+                                        jac = jac, mass = mass_c, applyM = applyM_form)
+            @test BifurcationKit.apply_mass_matrix(prob_amf, x, par, dx) ≈ c * M * dx
+        end
 
         @testset "mass derivatives (minimally augmented Hopf)" begin
             m = length(x1)

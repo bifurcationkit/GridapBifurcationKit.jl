@@ -1,4 +1,4 @@
-import BifurcationKit: _getvectortype
+import BifurcationKit: _getvectortype, apply_mass_matrix
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Mass operator kinds, form detection and ddl helpers
@@ -6,20 +6,20 @@ import BifurcationKit: _getvectortype
 
 # Mass operator flavours. `mass_type` is inferred from the `mass` keyword of
 # `GridapBifProblem` and drives `get_mass_matrix` dispatch:
-#   * `MassDefaut()`: no mass given, use the L² mass ∫(u⋅v)dΩ;
+#   * `MassDefault()`: no mass given, use the L² mass ∫(u⋅v)dΩ;
 #   * `ConstMass()` : a constant (state-independent) integrand `mass(u, v)`;
 #   * `SDMass()`    : a state-dependent operator `mass(u, p, du, v)`, i.e. M(x, p).
 abstract type AbstractMassType end
-struct MassDefaut <: AbstractMassType end
+struct MassDefault <: AbstractMassType end
 struct ConstMass <: AbstractMassType end
 struct SDMass <: AbstractMassType end
 
 # infer the mass type from a user-provided `mass` keyword: a 4-argument method
 # `mass(u, p, du, v)` is reported by `methods` as `nargs == 5` (callable + 4).
-_mass_type(::Nothing) = MassDefaut()
+_mass_type(::Nothing) = MassDefault()
 _mass_type(mass) = any(m -> m.nargs == 5, methods(mass)) ? SDMass() : ConstMass()
 
-_is_constant_mass(::MassDefaut) = true
+_is_constant_mass(::MassDefault) = true
 _is_constant_mass(::ConstMass) = true
 _is_constant_mass(::SDMass) = false
 
@@ -49,6 +49,18 @@ function _dual_fe_function(f::FESpace, z)
     return FEFunction(f, z, eltype(z).(Gridap.FESpaces.get_dirichlet_dof_values(f)))
 end
 
+# FE function with homogeneous (zero) Dirichlet data, sharing the eltype of the
+# direction `d` (Gridap otherwise rejects mixing non-Float64 free values with
+# Float64 Dirichlet values, cf. `_dual_fe_function`). State-derivative
+# directions carry zero Dirichlet data.
+function _homogeneous_dual_fe(f::MultiFieldFESpace, d)
+    dir = [eltype(d).(Gridap.FESpaces.zero_dirichlet_values(sp)) for sp in f.spaces]
+    return FEFunction(f, d, dir)
+end
+function _homogeneous_dual_fe(f::FESpace, d)
+    return FEFunction(f, d, eltype(d).(Gridap.FESpaces.zero_dirichlet_values(f)))
+end
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Parameter-agnostic FE problem
 # ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +87,7 @@ re-wrapped in an `FEOperator` by `op_from_param`) along a continuation.
 - `d2res(u, p, du1, du2, v)`: second derivative (Hessian) of `res`. May also be
   a `BK` sentinel (`BK.FiniteDifferences()`, `BK.AutoDiff()`), in which case it
   is reconstructed accordingly.
-- `d3res(u, p, du1, du2, du3, v)`: third derivative (Tressian) of `res`. May
+- `d3res(u, p, du1, du2, du3, v)`: third derivative of `res`. May
   also be a `BK` sentinel (`BK.FiniteDifferences()`, `BK.AutoDiff()`).
 - `V`: the `TestFESpace`.
 - `U`: the `TrialFESpace` (it carries the Dirichlet data).
@@ -91,10 +103,14 @@ re-wrapped in an `FEOperator` by `op_from_param`) along a continuation.
   * `mass.R01`: the operator `(x, p, v, w) -> ∂_p ⟨w, M(x,p) v⟩` (default
     `BK.AutoDiff()`), see `BK.R01_mass_matrix`;
   * `mass.∇x`: the operator `(x, p, v, w) -> ∇_x ⟨w, M(x,p) v⟩` (default
-    `BK.AutoDiff()`), see `BK.∇_x_mass_matrix`.
+    `BK.AutoDiff()`), see `BK.∇_x_mass_matrix`;
+  * `mass.applyM`: the application `(x, p, dx) -> M(x,p) dx`; by default it
+    assembles the mass matrix and multiplies it, see `BK.apply_mass_matrix`.
+  * `mass.dMv`: the jacobian (matrix) of the map `x -> M(x,p) v` (default
+    `BK.AutoDiff()`), see `BK.jacobian_apply_mass_matrix`.
   See [`get_mass_matrix`](@ref) and the *Mass matrix and derivatives* section
   below for the accepted signatures.
-- `mass_type`: kind of mass operator, one of `MassDefaut()` (default L² mass),
+- `mass_type`: kind of mass operator, one of `MassDefault()` (default L² mass),
   `ConstMass()` (state-independent bilinear integrand) or `SDMass()`
   (state-dependent `mass(u, p, du, v)`). It is inferred from `mass` by
   `_mass_type`.
@@ -102,7 +118,7 @@ re-wrapped in an `FEOperator` by `op_from_param`) along a continuation.
 # Mass matrix and derivatives
 The mass matrix is assembled on the free dofs by
 [`get_mass_matrix`](@ref) `(gp[, x, p])`; the state `x` is required for a
-state-dependent mass (`SDMass`), while a constant mass (`MassDefaut`,
+state-dependent mass (`SDMass`), while a constant mass (`MassDefault`,
 `ConstMass`) can be assembled without it. The kind is reported by `mass_type`
 and, at the level of a [`GridapBifProblem`](@ref), by
 `BK.is_mass_matrix_constant`.
@@ -117,7 +133,8 @@ derivatives, exposed through
 Both dispatch on the corresponding fields of `gp.mass`:
 * `mass.R01` / `mass.∇x` given as a user closure `(x, p, v, w) -> scalar` /
   `(x, p, v, w) -> vector` are used as is;
-* the `BK.AutoDiff()` and `BK.FiniteDifferences()` sentinels are evaluated by
+* the `BK.AutoDiff()` sentinel (for `mass.R01` and `mass.∇x`) and the
+  `BK.FiniteDifferences()` sentinel (for `mass.R01` only) are evaluated by
   ForwardDiff (resp. central finite differences) on `get_mass_matrix(gp, x, p)`.
 
 They are ignored for a constant mass, and are assembled with dual-valued free
@@ -128,10 +145,13 @@ dofs when needed (Dirichlet values are lifted to the dual type accordingly).
   `d2res(u, p, du1, du2, v)` (used by `BK.d2F`).
 - `(gp::GridapProblem)(u, p, du1, du2, du3)` returns the vector associated to
   `d3res(u, p, du1, du2, du3, v)` (used by `BK.d3F`).
-- `residual` and `jacobian` evaluate `res` and `jac` at a given state and
-  parameter value.
+- [`GridapBifurcationKit.residual`](@ref) and
+  [`GridapBifurcationKit.jacobian`](@ref) (and the in-place
+  [`GridapBifurcationKit.jacobian!`](@ref)) evaluate `res` and `jac` at a given
+  state and parameter value.
 - [`get_mass_matrix`](@ref) assembles the mass matrix, `BK.R01_mass_matrix` and
-  `BK.∇_x_mass_matrix` its parameter and state derivatives (see above).
+  `BK.∇_x_mass_matrix` its parameter and state derivatives (see above), and
+  `BK.apply_mass_matrix` applies it to a direction (through `mass.applyM`).
 
 # See also
 - [`GridapBifProblem`](@ref), [`get_mass_matrix`](@ref)
@@ -193,20 +213,48 @@ function op_from_param(gp::GridapProblem{Tres, Nothing}, p) where {Tres}
     return FEOperator(res, gp.U, gp.V)
 end
 
-# residual
+"""
+    residual(gp::GridapProblem, u::AbstractArray{<:Real}, p)
+
+Evaluate the residual of the discretized vector field ``F`` at the free dof
+vector `u` and parameter set `p`: the residual weak form `res(u, p, v)` is
+assembled for the parameter value `p` and returned as a vector of free dof
+values, see [`GridapProblem`](@ref).
+
+For a [`GridapBifProblem`](@ref), use `BifurcationKit.residual(prob, x, p)`.
+"""
 function residual(gp::GridapProblem, u::AbstractArray{ <: Real}, p)
     op = op_from_param(gp, p)
     algop = Gridap.FESpaces.get_algebraic_operator(op)
     return Gridap.FESpaces.residual(algop, u)
 end
 
-# (sparse) jacobian matrix
+"""
+    jacobian(gp::GridapProblem, u, p)
+
+Assemble the (sparse) jacobian of the residual with respect to the state, at the
+free dof vector `u` and parameter set `p`. The jacobian form `jac(u, p, du, v)`
+is used when provided, otherwise it is built by Gridap's automatic
+differentiation of `res` (see [`GridapProblem`](@ref)). For the in-place
+variant, see [`GridapBifurcationKit.jacobian!`](@ref).
+
+For a [`GridapBifProblem`](@ref), use `BifurcationKit.jacobian(prob, x, p)`,
+which dispatches on `prob.jacobianType` (`BK.FullSparse`, `BK.FullSparseInplace`
+or `BK.MatrixFree`).
+"""
 function jacobian(gp::GridapProblem, u, p)
     op = op_from_param(gp, p)
     algop = Gridap.FESpaces.get_algebraic_operator(op)
     return Gridap.FESpaces.jacobian(algop, u)
 end
 
+"""
+    jacobian!(A, gp::GridapProblem, u, p)
+
+In-place variant of [`GridapBifurcationKit.jacobian`](@ref): update the
+preallocated (sparse) matrix `A` with the jacobian of the residual at the free
+dof vector `u` and parameter set `p` (the sparsity pattern must stay constant).
+"""
 function jacobian!(A, gp::GridapProblem, u, p)
     op = op_from_param(gp, p)
     algop = Gridap.FESpaces.get_algebraic_operator(op)
@@ -223,16 +271,18 @@ function _residual_from_form(gp::GridapProblem, form, x, p)
 end
 
 # assemble an analytic parameter-derivative jacobian form `form(u, p, du, v)` and
-# apply it to `dx` (used for `R11`)
-function _apply_from_biform(gp::GridapProblem, form, x, p, dx)
-    uh = FEFunction(gp.U, x)
-    A  = Gridap.FESpaces.assemble_matrix((du, v) -> form(uh, p, du, v), gp.U, gp.V)
+# apply it to `dx` (used for `R11` and for a weak-form `applyM`)
+_apply_from_biform(gp::GridapProblem, form, x, p, dx) = _apply_from_biform(gp.U, gp.V, form, x, p, dx)
+
+function _apply_from_biform(U, V, form, x, p, dx)
+    uh = FEFunction(U, x)
+    A  = Gridap.FESpaces.assemble_matrix((du, v) -> form(uh, p, du, v), U, V)
     return A * dx
 end
 
 # ─── derivative flavours: analytic form, finite differences, ForwardDiff
 # FE function associated to a *direction* `d` (a free dof vector). The Hessian
-# and Tressian are derivatives w.r.t. the free dofs, so the direction must carry
+# and the third-order tensor are derivatives w.r.t. the free dofs, so the direction must carry
 # *homogeneous* Dirichlet data: `FEFunction(U, d)` would instead inject the
 # (generally non-zero) Dirichlet data of `U`.
 _homogeneous_fe(gp::GridapProblem, d) = FEFunction(gp.U, d, Gridap.FESpaces.zero_dirichlet_values(gp.U))
@@ -327,8 +377,9 @@ mass_default(u,v,dΩ) = ∫(u⋅v) * dΩ
 _scalar_eltype(::Type{T}) where {T} = (U = eltype(T); U === T ? T : _scalar_eltype(U))
 
 # shared assembly of a (bi)linear mass integrand over the free dofs
-function _assemble_mass_matrix(gp::GridapProblem, integrand)
-    (;U, V) = gp
+_assemble_mass_matrix(gp::GridapProblem, integrand) = _assemble_mass_matrix(gp.U, gp.V, integrand)
+
+function _assemble_mass_matrix(U, V, integrand)
     v = get_fe_basis(V)
     u = get_trial_fe_basis(U)
     assemblytuple = Gridap.FESpaces.collect_cell_matrix(U,V,integrand(u,v))
@@ -343,16 +394,24 @@ function _assemble_mass_matrix(gp::GridapProblem, integrand)
 end
 
 """
-    get_mass_matrix(gp::GridapBifProblem[, x, p])
-    get_mass_matrix(gp::GridapProblem[, x, p], dΩ = gp.dΩ)
+    get_mass_matrix(gp::GridapBifProblem)
+    get_mass_matrix(gp::GridapBifProblem, x, p)
+    get_mass_matrix(gp::GridapProblem, dΩ = gp.dΩ)
+    get_mass_matrix(gp::GridapProblem, x, p, dΩ = gp.dΩ)
 
 Assemble the (sparse) mass matrix associated to the problem, on the free dofs of the
 trial/test spaces (Dirichlet dofs are eliminated, consistently with the jacobian).
 
+`x` is the vector of free dof values of the current state and `p` the (full)
+parameter set; both are required when the mass depends on the state and/or on
+the parameters (`SDMass`) and are simply ignored for a constant mass. `dΩ`
+selects the `Measure` used for the assembly (default: the one stored in the
+problem).
+
 The operator is selected by `gp.mass_type`, itself inferred from the `mass`
 keyword of [`GridapBifProblem`](@ref):
 
-* `MassDefaut()`: no mass given, use the L² mass `∫(u⋅v)*dΩ`;
+* `MassDefault()`: no mass given, use the L² mass `∫(u⋅v)*dΩ`;
 * `ConstMass()` : the constant (state-independent) integrand `mass(u, v)`;
 * `SDMass()`    : the state-dependent operator `mass(u, p, du, v)`, reconstructed
   from the free dof vector `x` (i.e. `M(x, p)`); the `(gp, x, p)` methods must
@@ -364,22 +423,28 @@ pressure block, as required for the stability of the differential-algebraic
 system ``M\\dot z = F(z, p)``.
 """
 get_mass_matrix(gp::GridapProblem, dΩ = gp.dΩ) = _get_mass_matrix(gp.mass_type, gp, dΩ)
-_get_mass_matrix(::MassDefaut, gp::GridapProblem, dΩ) = _assemble_mass_matrix(gp, (u, v) -> mass_default(u, v, dΩ))
-_get_mass_matrix(::ConstMass, gp::GridapProblem, dΩ) = _assemble_mass_matrix(gp, gp.mass.M)
+_get_mass_matrix(mt, gp::GridapProblem, dΩ) = _mass_matrix(mt, gp.U, gp.V, dΩ, gp.mass.M)
 
 get_mass_matrix(gp::GridapProblem, x, p, dΩ = gp.dΩ) = _get_mass_matrix(gp.mass_type, gp, x, p, dΩ)
-_get_mass_matrix(::MassDefaut, gp::GridapProblem, x, p, dΩ) = _get_mass_matrix(MassDefaut(), gp, dΩ)
-_get_mass_matrix(::ConstMass, gp::GridapProblem, x, p, dΩ) = _assemble_mass_matrix(gp, gp.mass.M)
+_get_mass_matrix(mt, gp::GridapProblem, x, p, dΩ) = _mass_matrix(mt, gp.U, gp.V, dΩ, gp.mass.M, x, p)
 
-function _get_mass_matrix(::SDMass, ::GridapProblem, dΩ)
+# ─── state-less helpers operating on the raw mass integrand `mass`
+# (used both by `get_mass_matrix` through `gp.mass.M` and by the default
+# `applyM` of the `MassFunction`, built before the `GridapProblem` exists)
+_mass_matrix(::MassDefault, U, V, dΩ, mass) = _assemble_mass_matrix(U, V, (u, v) -> mass_default(u, v, dΩ))
+_mass_matrix(::ConstMass, U, V, dΩ, mass) = _assemble_mass_matrix(U, V, mass)
+_mass_matrix(::MassDefault, U, V, dΩ, mass, x, p) = _mass_matrix(MassDefault(), U, V, dΩ, mass)
+_mass_matrix(::ConstMass, U, V, dΩ, mass, x, p) = _mass_matrix(ConstMass(), U, V, dΩ, mass)
+
+function _mass_matrix(::SDMass, U, V, dΩ, mass)
     throw(ArgumentError("The mass operator passed to `GridapBifProblem` is state-dependent; call `get_mass_matrix(gp, x, p)` with the state `x` and parameters `p`."))
 end
 
-function _get_mass_matrix(::SDMass, gp::GridapProblem, x, p, dΩ)
+function _mass_matrix(::SDMass, U, V, dΩ, mass, x, p)
     # `_dual_fe_function` keeps the dual eltype of `x` on the Dirichlet values,
     # which Gridap otherwise rejects (needed by the AutoDiff mass derivatives).
-    uh = _dual_fe_function(gp.U, x)
-    return _assemble_mass_matrix(gp, (u, v) -> gp.mass.M(uh, p, u, v))
+    uh = _dual_fe_function(U, x)
+    return _assemble_mass_matrix(U, V, (u, v) -> mass(uh, p, u, v))
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -470,8 +535,9 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
     built and updated in place at each call (faster, but the sparsity pattern of
     the vector field must be constant);
   * `BK.MatrixFree()`: `BK.jacobian` returns a closure `dx -> J(x,p)*dx` computed
-    by ForwardDiff on the residual, without assembling the matrix. It must be
-    used together with a matrix-free linear solver (*e.g.* `GMRESIterativeSolvers`).
+    by Gridap's own AD on the residual weak form (per-cell ForwardDiff), without
+    assembling the global matrix. It must be used together with a matrix-free
+    linear solver (*e.g.* `GMRESIterativeSolvers`).
 - `jac(u, p, du, v)`: analytic jacobian. If `nothing` (default), it is built by
   Gridap from `res` (automatic differentiation).
 - `autodiff = false`: if `true`, `jac` is ignored and the jacobian is built by
@@ -494,16 +560,24 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
 - `R01M`, `∇xM`: derivatives of the mass, used by the minimally augmented Hopf
   formulation (`BK.newton_hopf`, `BK.continuation_hopf`) when `mass` depends on
   the parameters or on the state:
-  * `R01M(x, p, v, w) -> scalar` computes ``∂_p\\langle w, M(x,p) v\\rangle``,
-    differentiating along `lens` (or the sentinels `BK.AutoDiff()`,
-    `BK.FiniteDifferences()`, `nothing`);
+  * `R01M` computes ``∂_p\\langle w, M(x,p) v\\rangle``, differentiating along
+    `lens`. It accepts `BK.AutoDiff()` (default), `BK.FiniteDifferences()` or an
+    already assembled closure `(x, p, v, w) -> scalar`;
   * `∇xM` computes ``\\nabla_x\\langle w, M(x,p) v\\rangle``. It accepts
-    `BK.AutoDiff()` (default), `BK.FiniteDifferences()`, `nothing`, an already
-    assembled closure `(x, p, v, w) -> Vector`, or an **analytic** Gridap weak
-    form `dM(u, p, du1, du2, v)`: the state-derivative direction of the mass
+    `BK.AutoDiff()` (default), an already assembled closure
+    `(x, p, v, w) -> Vector`, or an **analytic** Gridap weak form
+    `dM(u, p, du1, du2, v)`: the state-derivative direction of the mass
     bilinear form, with `du2` the mass direction and `v` the test function
     (assembled with homogeneous Dirichlet directions, like `d2res`).
   They are ignored for a constant mass.
+- `applyM(x, p, dx)`: application of the mass matrix, ``M(x, p)\\, dx``. It is
+  stored in the `applyM` field of the underlying `BK.MassFunction` and returned
+  by `BK.apply_mass_matrix(prob, x, p, dx)` (*e.g.* used by the periodic orbit
+  trapeze solver). By default (`nothing`), the mass matrix is assembled with
+  [`get_mass_matrix`](@ref) and multiplied. It can also be:
+  * a user closure `(x, p, dx) -> M(x, p) * dx`, used as is;
+  * an **analytic** weak form `applyM(u, p, du, v)` (same signature as `jac`),
+    assembled with the same convention as `jac` and applied to `dx` on the fly.
 - `R01`, `R02`, `R11`: parameter-derivative operators used for stability and
   normal-form computations. In addition to the `BK` sentinels
   (`BK.FiniteDifferences()`, `BK.AutoDiff()`, `nothing`) and to an already
@@ -517,8 +591,9 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
   scalar value of the continuation parameter.
 - `record_from_solution = BK.record_sol_default`, `plot_solution = BK.plot_default`:
   callbacks used during continuation, see the `BK` documentation.
-  `record_from_solution(x, p)` returns a small `NamedTuple` of indicators stored
-  along the branch; `plot_solution(x, p; kwargs...)` displays the solution.
+  `record_from_solution(x, p)` returns a small value (typically a `NamedTuple`)
+  of indicators stored along the branch; `plot_solution(x, p; kwargs...)`
+  displays the solution.
 - `delta`: finite-difference step used by `BK` for the parameter derivatives
   (default: `sqrt(eps)` of the state's scalar type).
 - `kwargs_jet...`: further keyword arguments forwarded to `BK.Jet`.
@@ -538,15 +613,17 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
 
 # Extended methods
 - [`get_mass_matrix`](@ref) and `BK.getmassmatrix(prob, x, p)` assemble the mass
-  matrix; `BK.is_mass_matrix_constant(prob)` tells whether it is constant.
-- `residual(prob, x, p)`, `jacobian(prob, x, p)` and `BK.dF`, `BK.d2F`, `BK.d3F`
-  evaluate the vector field and its derivatives. `BK.jacobian` dispatches on
-  `jacobian_type`: it returns a sparse matrix for `BK.FullSparse()` /
-  `BK.FullSparseInplace()` and a matrix-free closure `dx -> J(x,p)*dx` for
+  matrix; `BK.is_mass_matrix_constant(prob)` tells whether it is constant, and
+  `BK.apply_mass_matrix(prob, x, p, dx)` applies it to a direction.
+- `BK.residual(prob, x, p)`, `BK.jacobian(prob, x, p)` and `BK.dF`, `BK.d2F`,
+  `BK.d3F` evaluate the vector field and its derivatives. `BK.jacobian`
+  dispatches on `jacobian_type`: it returns a sparse matrix for `BK.FullSparse()`
+  / `BK.FullSparseInplace()` and a matrix-free closure `dx -> J(x,p)*dx` for
   `BK.MatrixFree()`.
 - `BK.R01`, `BK.R02`, `BK.R11` evaluate the parameter derivatives.
-- `BK.R01_mass_matrix` and `BK.∇_x_mass_matrix` provide the mass derivatives
-  required by the minimally augmented Hopf formulation.
+- `BK.R01_mass_matrix`, `BK.∇_x_mass_matrix` and `BK.jacobian_apply_mass_matrix`
+  provide the mass derivatives required by the minimally augmented Hopf
+  formulation.
 - The problem is not inplace, not symmetric and has no adjoint
   (`BK.isinplace`, `BK.is_symmetric`, `BK.has_adjoint`).
 
@@ -558,6 +635,7 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
 # Example
 ```julia
 # -u'' + u + u³ = λ on (0,1), with a state-dependent mass
+# (u0, V, U, dΩ as in the Gridap tutorials)
 res(u, p, v)     = ∫(∇(u) ⋅ ∇(v) + u * v + u^3 * v - p.λ * v) * dΩ
 jac(u, p, du, v) = ∫(∇(du) ⋅ ∇(v) + du * v + 3 * u^2 * du * v) * dΩ
 mass(u, p, du, v) = ∫((1 + u^2) * du * v) * dΩ
@@ -565,8 +643,8 @@ mass(u, p, du, v) = ∫((1 + u^2) * du * v) * dΩ
 prob = GridapBifProblem(res, u0, (λ = 1.0,), V, U, dΩ, (@optic _.λ);
                         jac = jac, mass = mass)
 
-sol = BK.solve(prob, BK.Newton(), optn)
-br  = BK.continuation(prob, BK.Natural(), opts)
+sol = BK.solve(prob, BK.Newton(), optn)         # optn: BK.NewtonPar
+br  = BK.continuation(prob, BK.Natural(), opts) # opts: BK.ContinuationPar
 ```
 """
 struct GridapBifProblem{Tfe, Tjac, Tjc, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: BK.AbstractDAEBifProblem
@@ -580,7 +658,7 @@ struct GridapBifProblem{Tfe, Tjac, Tjc, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: B
     u0::Tu
     "parameters"
     params::Tp
-    "Typically a `Accessors.PropertyLens`. It specifies which parameter axis among `params` is used for continuation. For example, if `par = (α = 1.0, β = 1)`, we can perform continuation w.r.t. `α` by using `lens = (@optic _.α)`. If you have an array `par = [ 1.0, 2.0]` and want to perform continuation w.r.t. the first variable, you can use `lens = (@optic _[1])`. For more information, we refer to `Accessors.jl`."
+    "Typically an `Accessors` optic. It specifies which parameter axis of `params` is used for continuation. For example, if `par = (α = 1.0, β = 1)`, we can perform continuation w.r.t. `α` by using `lens = (@optic _.α)`. If you have an array `par = [ 1.0, 2.0]` and want to perform continuation w.r.t. the first variable, you can use `lens = (@optic _[1])`. For more information, we refer to `Accessors.jl`."
     lens::Tl
     "user function to plot solutions during continuation. Signature: `plotSolution(x, p; kwargs...)`"
     plotSolution::Tplot
@@ -609,6 +687,9 @@ function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
                 mass = nothing,
                 R01M = BK.AutoDiff(),
                 ∇xM  = BK.AutoDiff(),
+                applyM = nothing,
+
+                dF = BK.AutoDiff(),
 
                 kwargs_jet...)
     jacFE = autodiff ? nothing : jac
@@ -617,8 +698,21 @@ function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
     # assembled `(x, p, v, w) -> Vector` closures are forwarded untouched.
     ∇xMjet = _is_mass_hess_form(∇xM) ?
         ((x, p, v, w) -> _mass_grad_from_form(U, V, ∇xM, x, p, v, w)) : ∇xM
-    massfun = BK.MassFunction(mass; Mᵗ = nothing, R01 = R01M, ∇x = ∇xMjet)
-    probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing, dΩ, massfun, _mass_type(mass))
+    mass_type = _mass_type(mass)
+    # the mass is a weak form: the default application assembles the mass
+    # matrix and multiplies it. A user `applyM` is stored in the `applyM` field
+    # of the `MassFunction` (see `BK.apply_mass_matrix`); it can be a closure
+    # `(x, p, dx) -> M(x, p) * dx` (used as is) or an analytic weak form
+    # `applyM(u, p, du, v)` (assembled like `jac`).
+    my_applyM = if isnothing(applyM)
+        (x, p, dx) -> _mass_matrix(mass_type, U, V, dΩ, mass, x, p) * dx
+    elseif _is_jac_form(applyM)
+        (x, p, dx) -> _apply_from_biform(U, V, applyM, x, p, dx)
+    else
+        applyM
+    end
+    massfun = BK.MassFunction(mass; Mᵗ = nothing, R01 = R01M, ∇x = ∇xMjet, applyM = my_applyM)
+    probFE = GridapProblem(res, jacFE, d2res, d3res, V, U, nothing, dΩ, massfun, mass_type)
     # analytic parameter-derivative forms (if provided) are assembled on the fly,
     # with the same convention as `res`/`jac`; BK sentinels and
     # already assembled `(x, p) -> Vector` closures are forwarded untouched.
@@ -672,7 +766,7 @@ end
 # assembling the matrix. It must be used with a matrix-free linear solver.
 _jacobian(pb::GridapBifProblem, ::BK.MatrixFree, u, p) = dx -> _jvp_ad(pb, u, p, dx)
 
-function _jacobian(pb::GridapBifProblem, jt, u, p)
+function _jacobian(::GridapBifProblem, jt, u, p)
     throw(ArgumentError("jacobian_type = $jt is not supported; use BK.FullSparse(), BK.FullSparseInplace() or BK.MatrixFree()."))
 end
 
@@ -687,7 +781,6 @@ BK.dF(pb::GridapBifProblem, u, p, dx) = BK.apply(BK.jacobian(pb, u, p), dx)
 
 BK.d2F(pb::GridapBifProblem, u, p, dx1::AbstractArray{<:Real}, dx2::AbstractArray{<:Real}) = pb.probFE(u, p, dx1, dx2)
 function BK.d2F(pb::GridapBifProblem, x, p, dx1, dx2)
-    @error "******* d2F"
     probFE = pb.probFE
     dx1r = real.(dx1); dx2r = real.(dx2)
     dx1i = imag.(dx1); dx2i = imag.(dx2)
@@ -714,14 +807,19 @@ BK.R11(::BK.TraitUserPassed, prob::GridapBifProblem, x, p, dx) = prob.jet.R11(x,
 get_mass_matrix(prob::GridapBifProblem) = get_mass_matrix(prob.probFE)
 get_mass_matrix(prob::GridapBifProblem, x, p) = get_mass_matrix(prob.probFE, x, p)
 BK.is_mass_matrix_constant(prob::GridapBifProblem) = _is_constant_mass(prob.probFE.mass_type)
+BK.has_trivial_mass_mastrix(::GridapBifProblem) = false
 BK.getmassmatrix(prob::GridapBifProblem, x, p) = get_mass_matrix(prob.probFE, x, p)
+# application of the mass matrix, dispatched through the `applyM` field of the
+# `BK.MassFunction` stored in `probFE.mass` (assembled mass by default)
+apply_mass_matrix(gp::GridapProblem, x, p, dx) = apply_mass_matrix(gp.mass, x, p, dx)
+BK.apply_mass_matrix(prob::GridapBifProblem, x, p, dx) = apply_mass_matrix(prob.probFE, x, p, dx)
+BK.jacobian_apply_mass_matrix(prob::GridapBifProblem, x, p, v) = BK.jacobian_apply_mass_matrix(prob.probFE.mass, x, p, v)
 
 # mass derivatives expected by the minimally augmented Hopf formulation of BK;
 # the implementations live next to `get_mass_matrix` (see above).
 BK.R01_mass_matrix(prob::GridapBifProblem, x, p, v, w) = _R01_mass_matrix(prob.probFE.mass.R01, prob, x, p, v, w)
 BK.∇_x_mass_matrix(prob::GridapBifProblem, x, p, v, w) = _∇_x_mass_matrix(prob.probFE.mass.∇x, prob, x, p, v, w)
 
-# ─── display
 function Base.show(io::IO, prob::GridapBifProblem; prefix = "")
     gp = prob.probFE
     print(io, prefix, "┌─ Gridap Bifurcation Problem with uType ")
