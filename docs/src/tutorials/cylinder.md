@@ -1,4 +1,4 @@
-# [🟤 Compressible flow past a cylinder: state-dependent mass, Hopf bifurcation and periodic orbits](@id cylinder)
+# [🟡 Compressible flow past a cylinder: state-dependent mass, Hopf bifurcation and periodic orbits](@id cylinder)
 
 ```@contents
 Pages = ["cylinder.md"]
@@ -174,7 +174,7 @@ br = BK.continuation(prob, BK.Natural(), opts;
 BK.plot(br)[1]
 ```
 
-![image](br-cylinder.png)
+![](br-cylinder.png)
 
 ## Hopf bifurcation curve
 
