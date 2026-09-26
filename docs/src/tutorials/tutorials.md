@@ -21,10 +21,10 @@ Pages = ["bratu-disk.md"]
 Depth = 1
 ```
 
-## PDEs: equilibria, Hopf bifurcation and periodic orbits
+## PDEs: equilibria, Hopf bifurcation and (bifurcations of) periodic orbits
 
 ```@contents
 Pages = ["brusselator.md"]
 Depth = 1
 ```
-## PDEs: bifurcations of periodic orbits
+

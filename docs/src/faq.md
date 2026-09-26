@@ -5,7 +5,7 @@ See also [FAQ of BifurcationKit.jl](https://bifurcationkit.github.io/Bifurcation
 ## Which mass matrix should I use for the stability of an incompressible flow?
 
 For the incompressible Navier–Stokes equations, the pressure has no time derivative, so the
-semi-discrete system is ``M\dot z = F(z, p)`` with a **singular** mass matrix whose pressure
+semi-discrete system is ``M(u,p)\dot u = F(u, p)`` with a **singular** mass matrix whose pressure
 block is zero. You should therefore pass the *velocity only* mass:
 
 ```julia

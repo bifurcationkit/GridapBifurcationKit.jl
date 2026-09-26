@@ -46,7 +46,7 @@ function res((u,v),p,(V1, V2))
     NL2(u,v) = p.λ - u^2*v - p.σ * (u-1/v)^2
 
       ∫(  -∇(u)⋅∇(V1) + NL1∘(u,v) ⋅ V1 +
-    -p.d * ∇(v)⋅∇(V2) + NL2∘(u,v) ⋅ V2 )*dΩ
+    (-p.d) * ∇(v)⋅∇(V2) + NL2∘(u,v) ⋅ V2 )*dΩ
 end
 
 function jac((u,v),p,(du, dv),(V1, V2))
@@ -87,8 +87,6 @@ plotsol(sol; k...) = (plot();plotsol!(sol; k...))
 ####################################################################################################
 using Statistics
 
-const w = rand(length(BK.getu0(prob))÷2)
-
 recordSolSCH(x, p; k...) = (
             # u0 = reshape(x[1:length(x)÷2],Nx,Ny)[Nx÷2,Ny÷2],
             u0 = x[length(x)÷4],
@@ -105,6 +103,8 @@ prob = GridapBifProblem(res, uh, par_sh, Y, X, dΩ, (@optic _.λ);
             record_from_solution = recordSolSCH,
             # record_from_solution = (x, p) -> norm(x[1:length(x)÷2] .- p, 8),
             )
+
+const w = rand(length(BK.getu0(prob))÷2)
 
 eig = EigArpack(0.1, :LM, tol = 1e-12)
 # eig = EigArnoldiMethod(sigma = 0.1, which  = LM())
