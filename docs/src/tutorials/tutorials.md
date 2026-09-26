@@ -34,3 +34,11 @@ Depth = 1
 Pages = ["cge.md"]
 Depth = 1
 ```
+
+## compressible flows, state-dependent mass and periodic orbits
+
+```@contents
+Pages = ["cylinder.md"]
+Depth = 1
+```
+
