@@ -542,6 +542,13 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
   Gridap from `res` (automatic differentiation).
 - `autodiff = false`: if `true`, `jac` is ignored and the jacobian is built by
   Gridap from `res`.
+- `dF = BK.AutoDiff()`: the operator `(x, p, dx) -> J(x, p) * dx` used for
+  jacobian-vector products (*e.g.* by `BK.dF` and the matrix-free eigensolvers).
+  Accepted values:
+  * `BK.AutoDiff()` (default): the per-cell AD jacobian of `res` is applied to
+    `dx` without assembling the global matrix;
+  * `BK.FullSparse()`: the sparse jacobian returned by `BK.jacobian` is assembled
+    and multiplied by `dx`.
 - `d2res`, `d3res`: second and third derivatives of the residual, used by
   `d2F`/`d3F` (*e.g.* for automatic branch switching with a non-simple kernel).
   Accepted values:
@@ -610,6 +617,7 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
 - `plotSolution`, `recordFromSolution`: the callbacks.
 - `δ`: the finite-difference step.
 - `jet::BK.Jet`: the parameter-derivative operators.
+- `dF`: the selected jacobian-vector product operator, see the `dF` keyword.
 
 # Extended methods
 - [`get_mass_matrix`](@ref) and `BK.getmassmatrix(prob, x, p)` assemble the mass
@@ -647,7 +655,7 @@ sol = BK.solve(prob, BK.Newton(), optn)         # optn: BK.NewtonPar
 br  = BK.continuation(prob, BK.Natural(), opts) # opts: BK.ContinuationPar
 ```
 """
-struct GridapBifProblem{Tfe, Tjac, Tjc, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: BK.AbstractDAEBifProblem
+struct GridapBifProblem{Tfe, Tjac, Tjc, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet, TdF} <: BK.AbstractDAEBifProblem
     "gridap problem"
     probFE::Tfe
     "selected jacobian kind: `BK.FullSparse()`, `BK.FullSparseInplace()` or `BK.MatrixFree()`"
@@ -668,6 +676,8 @@ struct GridapBifProblem{Tfe, Tjac, Tjc, Tu, Tp, Tl, Tplot, Trec, Tδ, Tjet} <: B
     δ::Tδ
     "Taylor jet w.r.t. parameters."
     jet::Tjet
+    "jacobian-vector product operator `(x, p, dx) -> J(x, p) * dx`, see the `dF` keyword of the constructor"
+    dF::TdF
 end
 
 # constructors (see docstring of the `GridapBifProblem` type above)
@@ -723,7 +733,7 @@ function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
     jet = BK.Jet(; δ = delta, R01 = R01jet, R02 = R02jet, R11 = R11jet, kwargs_jet...)
     x0 = Gridap.get_free_dof_values(u0)
     J = _init_jacobian(probFE, jacobian_type, x0, parms)
-    return GridapBifProblem(probFE, jacobian_type, J, x0, parms, lens, plot_solution, record_from_solution, delta, jet)
+    return GridapBifProblem(probFE, jacobian_type, J, x0, parms, lens, plot_solution, record_from_solution, delta, jet, dF)
 end
 
 # preallocate the jacobian only for the in-place flavour (a fresh matrix is
@@ -777,7 +787,9 @@ function _jvp_ad(pb::GridapBifProblem, u, p, dx)
 end
 
 BK.jacobian!(pb::GridapBifProblem, J, u, p) = jacobian!(J, pb.probFE, u, p)
-BK.dF(pb::GridapBifProblem, u, p, dx) = BK.apply(BK.jacobian(pb, u, p), dx)
+BK.dF(pb::GridapBifProblem, u, p, dx) = dF(pb, pb.dF, u, p, dx)
+dF(pb, ::BK.AutoDiff, u, p, dx) = _jvp_ad(pb, u, p, dx)
+dF(pb, ::BK.FullSparse, u, p, dx) = BK.apply(BK.jacobian(pb, u, p), dx)
 
 BK.d2F(pb::GridapBifProblem, u, p, dx1::AbstractArray{<:Real}, dx2::AbstractArray{<:Real}) = pb.probFE(u, p, dx1, dx2)
 function BK.d2F(pb::GridapBifProblem, x, p, dx1, dx2)

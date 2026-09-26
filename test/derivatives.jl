@@ -135,4 +135,13 @@ end
     @test v3_fd ≈ v3_an rtol = 1e-4
     @test v2_ad ≈ v2_fd rtol = 1e-6
     @test v3_ad ≈ v3_fd rtol = 1e-4
+
+    # matrix-free JVP (Gridap AD on the weak form) matches the analytic jacobian
+    prob_mf = GridapBifProblem(res, uh, par, Y, X, dΩ, (@optic _.λ);
+                               jac = jac, jacobian_type = BifurcationKit.MatrixFree())
+    Jref = BifurcationKit.jacobian(prob_an, x, par)
+    Jmf = BifurcationKit.jacobian(prob_mf, x, par)
+    @test Jmf isa Function
+    @test Jmf(du1) ≈ Jref * du1 rtol = 1e-6
+    @test BifurcationKit.dF(prob_mf, x, par, du1) ≈ Jref * du1 rtol = 1e-6
 end
