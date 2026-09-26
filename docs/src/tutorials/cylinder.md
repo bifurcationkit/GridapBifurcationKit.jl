@@ -8,14 +8,12 @@ Depth = 3
 This tutorial is about the 2-D compressible flow past a cylinder. It is a translation to Gridap of the example from the
 [ff-bifbox](https://github.com/cmdoug/ff-bifbox) paper [^DouglasJolivet]. The equations are the following:
 
-$$
-\begin{align}
+$$\begin{align}
     \left(\gamma{}M^2p+1\right)\left(\frac{\partial\boldsymbol{u}}{\partial t}+\boldsymbol{u}\boldsymbol{\cdot}\boldsymbol{\nabla}\boldsymbol{u}
     \right)+T\left(\boldsymbol{\nabla}{}p-\boldsymbol{\nabla}\boldsymbol{\cdot}\boldsymbol{\tau}\right)&=0,\\
     \hspace{-1mm}\left(\gamma{}M^2p+1\right)\left(\frac{\partial{}T}{\partial t}+\boldsymbol{u}\boldsymbol{\cdot}\boldsymbol{\nabla}{}T+\left(\gamma-1\right)T\left(\boldsymbol{\nabla}\boldsymbol{\cdot}\boldsymbol{u}\right)\right)-\left(\gamma-1\right)\gamma{}M^2T\left(\boldsymbol{\nabla}\boldsymbol{u}\boldsymbol{:}\boldsymbol{\tau}\right)-\frac{\gamma{}T}{RePr}\nabla^2T&=0,\\
     \gamma{}M^2T\left(\frac{\partial{}p}{\partial t}+\boldsymbol{u}\boldsymbol{\cdot}\boldsymbol{\nabla}{}p\right)-\left(\gamma{}M^2p+1\right)\left(\frac{\partial{}T}{\partial t}+\boldsymbol{u}\boldsymbol{\cdot}\boldsymbol{\nabla}{}T-T\left(\boldsymbol{\nabla}\boldsymbol{\cdot}\boldsymbol{u}\right)\right)&=0,
-\end{align}
-$$
+\end{align}$$
 
 where $\tau_{ij}=\frac{\partial u_i}{\partial x_j}+\frac{\partial u_j}{\partial x_i}-\frac{2}{3}\delta_{ij}\frac{\partial u_k}{\partial x_k}$.
 We refer to the paper[^DouglasJolivet] for the boundary conditions.
@@ -201,7 +199,7 @@ br_h = BK.continuation(br, 1, (@optic _.M), opts_hopf;
 BK.plot(br_h)[1]
 ```
 
-![alt text](hopf-curve-NS-1.png)
+![alt text](hopf-curve-NS.png)
 
 
 ## Periodic orbits
