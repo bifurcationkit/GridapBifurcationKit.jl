@@ -3,16 +3,19 @@ using Pkg
 pkg"activate ."
 
 using Revise
-# using Plots
 using GridapGmsh
 using GridapGmsh: gmsh
 using GridapMakie, GLMakie
 Makie.inline!(true)
 using Gridap
 using Gridap.FESpaces
+using FFTW
+using BifurcationKit, LinearAlgebra, SparseArrays
 using GridapBifurcationKit
-using BifurcationKit
 const BK = BifurcationKit
+ENV["JULIA_DEBUG"] = BifurcationKit
+
+amplitude(x) = maximum(x) - minimum(x)
 ####################################################################################################
 function buildDisk(h::Float64, R, filename = "MyDisk-CGE.msh")
         gmsh.initialize()
@@ -25,7 +28,7 @@ function buildDisk(h::Float64, R, filename = "MyDisk-CGE.msh")
     
         # Create 3 Points on the circle
         points = []
-        Nd = 3
+        Nd = 4
         for j in 1:Nd
             push!(points, model.geo.addPoint(R*cos(2*pi*j/Nd), R*sin(2*pi*j/Nd), 0, h))
         end
@@ -37,7 +40,7 @@ function buildDisk(h::Float64, R, filename = "MyDisk-CGE.msh")
         end
     
         # Curveloop and Surface
-        curveloop = model.geo.addCurveLoop([1,2,3])
+        curveloop = model.geo.addCurveLoop([1,2,3,4])
         disk = model.geo.addPlaneSurface([curveloop])
     
         # This command is mandatory and synchronize CAD with GMSH Model. The less you launch it, the better it is for performance purpose
@@ -190,7 +193,7 @@ prob = GridapBifProblem(res, uh, par_cge, Y, X, dΩ, (@optic _.r);
                         )
 
 eig_gridap = EigArnoldiMethod(sigma = 0.4, which  = BK.LM())
-eig_gridap = EigArpack(sigma = 0.4, which  = :LM)
+# eig_gridap = EigArpack(sigma = 0.4, which  = :LM)
 optn = NewtonPar(eigsolver = eig_gridap)
 sol = @time BK.solve(prob, BK.Newton(), NewtonPar(optn; verbose = true))
 plotgridap(sol.u )
@@ -207,7 +210,7 @@ BK.plot(br)[1]
 ####################################################################################################
 # SW: A=B
 # RW  A > B = 0
-function guessFromHopfO2(branch, ind_hopf, eigsolver, M, A, B;  k = 1, phase = 0)
+function guessFromHopfO2(branch, ind_hopf, eigsolver, M, A, B;  k = 1, phase = 0, kw...)
     specialpoint = branch.specialpoint[ind_hopf]
     ind_ev = specialpoint.ind_ev
     @error "" ind_ev branch.eig[specialpoint.idx].eigenvals
@@ -228,25 +231,13 @@ function guessFromHopfO2(branch, ind_hopf, eigsolver, M, A, B;  k = 1, phase = 0
 end
 
 M = 10 # number of time slices (plotting purposes)
-pred = guessFromHopfO2(br, 2, optn.eigsolver, M, 40*(1+im), 40*(1+im); k = 2); #TW
+pred = guessFromHopfO2(br, 2, optn.eigsolver, M, 40*(1+im), -40*(1+im); k = 2); #TW
 r_hopf = pred.p; Th = pred.period; orbitguess_tw = pred.guess; ωH = pred.ω
 u_ref = copy(orbitguess_tw[1][1:length(prob.u0)])
+u_ref = 10copy(br.eig[11].eigenvecs[:,3]|>real|>normalize)
 
-begin
-    f = Figure()
-    n = 1
-    for i=1:3,j=1:3
-        ga = f[i, j] = GridLayout()
-        plotgridap!(Axis(ga[1,1]), real.(orbitguess_tw[n][1:length(prob.u0)]) )
-        n += 1
-    end
-    f
-end
-
-probTW = TWModel(re_make(prob, params = (par_cge..., r = r_hopf - 0.01)), 
-            # (Gθ, Gphase), 
+probTW = TWModel(re_make(prob, params = (par_cge..., r = r_hopf-0.1)), 
             Gθ,
-            # Gphase,
             u_ref; 
             DAE = [false],
             jacobian = BK.FullLU())
@@ -255,17 +246,25 @@ plotgridap(probTW.u₀)
 
 begin
     wave = newton(probTW, 
-            # vcat(u_ref, 0),
-            vcat(u_ref, ωH),
-            # vcat(u_ref, 0, ωH),
-            NewtonPar(verbose = true, max_iterations = 25, tol = 1e-9),
+            vcat(u_ref, -ωH),
+            NewtonPar(verbose = true, max_iterations = 70, tol = 1e-9),
             normN = norminf,
         )
-    println("s = ", wave.u[end-1], ", ω = " , wave.u[end], ", ||u||₂ = ", N2(wave.u[1:end-probTW.nc]))
+    println("s = ", wave.u[end], ", ||u||₂ = ", N2(wave.u[1:end-probTW.nc]))
     plotgridap(wave.u[1:end-probTW.nc] )
 end
 
-opt_cont_br = ContinuationPar(p_min = -5.5, p_max = 1.5, newton_options = optn, ds= 0.001, dsmax = 0.04, detect_bifurcation = 3, nev = 30, n_inversion = 8, tol_stability = 1e-5, plot_every_step = 2, max_steps = 100)
+opt_cont_br = ContinuationPar(p_min = -5.5,
+                                p_max = 1.5,
+                                newton_options = optn,
+                                ds= 0.001,
+                                dsmax = 0.04,
+                                detect_bifurcation = 3,
+                                nev = 30,
+                                n_inversion = 8,
+                                tol_stability = 1e-4,
+                                plot_every_step = 2,
+                                max_steps = 100)
 br_TW = @time continuation((probTW), deepcopy(wave.u), PALC(tangent = Bordered()), opt_cont_br;
     eigsolver = BK.EigenWave(br.contparams.newton_options.eigsolver, false),
     record_from_solution = (x, p; k...) -> (max = maximum(x[1:end-probTW.nc]), nrm = norm(x[1:end-probTW.nc]), s = x[end], amp = amplitude(x[1:end-probTW.nc])),
@@ -274,8 +273,7 @@ br_TW = @time continuation((probTW), deepcopy(wave.u), PALC(tangent = Bordered()
                     # BK.plot!(ax1, br)
     end,
     finalise_solution = (z, tau, step, contResult; k...) -> begin
-            N2(z.u[1:end-probTW.nc]) > 0.001
-            true
+            N2(z.u[1:end-probTW.nc]) > 0.01
     end, 
     verbosity = 1,
     normC = norminf,
@@ -284,7 +282,7 @@ br_TW = @time continuation((probTW), deepcopy(wave.u), PALC(tangent = Bordered()
     )
 
 begin
-    f, ax = BK.plot(br_TW, vars = (:param, :))
+    f, ax = BK.plot(br_TW, vars = (:param, :nrm))
     BK.plot!(ax, br)
     f
 end
@@ -294,14 +292,11 @@ end
 # - #  3,     hopf at r ≈ +1.24308802 ∈ (+1.24297898, +1.24308802), |δp|=1e-04, [converged], δ = ( 2,  2), step =  27
 ######################################################################
 using SparseArrays
-
-hp = BK.get_normal_form(br_TW, 3; start_with_eigen = Val(false), detailed = Val(true), verbose = true)
+hp = BK.get_normal_form(br_TW, 2; start_with_eigen = Val(false), detailed = Val(true), verbose = true)
 
 probMTW = Trapeze(M = 20 ;
     N = length(br_TW.prob.u0),
     # massmatrix = spdiagm(0 => vcat(ones(length(prob.u0)), 0.)),
-    # linear solver for the periodic orbit problem
-    # OPTIONAL, one could use the default
     jacobian = BK.FullLU())
 
 opts_po_cont = ContinuationPar(dsmin = 0.0001, dsmax = 0.01, ds= 0.005, p_max = 2.05, max_steps = 20, newton_options = optn, nev = 30, tol_stability = 1e-2, detect_bifurcation = 2, plot_every_step = 1)
@@ -355,7 +350,7 @@ BK.plot(br_MTW1)[1]
 
 begin
     ind = 20
-    sol = BK.get_periodic_orbit(br_MTW2, ind)
+    sol = BK.get_periodic_orbit(br_MTW1, ind)
     f = Figure(size=(700,700))
     inds = round.(Int, LinRange(1, size(sol.u, 2), 9))   # 9 tranches temporelles
     for (k, (i, j)) in enumerate(Iterators.product(1:3, 1:3))
@@ -368,7 +363,7 @@ end
 
 br_MTW2 =  continuation(
     br_TW, 3,
-    opts_po_cont,
+    ContinuationPar(opts_po_cont, detect_bifurcation = 0),
     probMTW ;
      eigsolver = BK.FloquetQaD(DefaultEig(), false),
     verbosity = 3,
@@ -407,9 +402,10 @@ br_MTW2.period
 lines(br_MTW2.param, abs.(2pi ./ br_MTW2.s) ./ br_MTW2.period)
 BK.plot(br_MTW2)[1]
 ######################################################################
-pred = guessFromHopfO2(br, 2, optn.eigsolver, M, 40*(1+0im), 0*(1+im); k = 1); #SW
+pred = guessFromHopfO2(br, 2, optn.eigsolver, M, 2*(1+0im), 0*(1+im); k = 1); #SW
 r_hopf = pred.p; Th = pred.period; orbitguess_sw = pred.guess; ωH = pred.ω
 u_ref = copy(orbitguess_sw[1][1:length(prob.u0)])
+u_ref = 4copy(br.eig[11].eigenvecs[:,3]|>real|>normalize)
 
 begin
     f = Figure()
@@ -422,9 +418,7 @@ begin
     f
 end
 
-probSW = TWModel(re_make(prob, params = (par_cge..., r = r_hopf - 0.0)), 
-            # (Gθ, Gphase), 
-            # Gθ,
+probSW = TWModel(re_make(prob, params = (par_cge..., r = r_hopf - 0.01)), 
             Gphase,
             deepcopy(u_ref); 
             DAE = [0],
@@ -440,13 +434,11 @@ plotgridap(probSW.u₀)
 begin
     optn = NewtonPar(verbose = true, max_iterations = 40, tol = 1e-10)
     wave_sw = newton(probSW, 
-        vcat(u_ref, 1*0.03),
-        # vcat(u_ref, -ωH, 0ωH),
-        # vcat(u_ref, 0, ωH),
+        vcat(u_ref, ωH),
         optn,
         normN = norminf,
     )
-println("s = ", wave_sw.u[end-1], ", ω = " , wave_sw.u[end], ", ||u||₂ = ", N2(wave_sw.u[1:end-probSW.nc]))
+println("ω = " , wave_sw.u[end], ", ||u||₂ = ", N2(wave_sw.u[1:end-probSW.nc]))
 
 f=Figure()
 plotgridap!(Axis(f[1,1]), u_ref )
@@ -454,18 +446,32 @@ plotgridap!(Axis(f[1,3]), wave_sw.u[1:end-probSW.nc] )
 f
 end
 
-amplitude(x) = maximum(x) - minimum(x)
-opt_cont_br = ContinuationPar(p_min = -5.5, p_max = 1.5, newton_options = NewtonPar(optn, max_iterations = 5), ds= -0.001, dsmax = 0.05, detect_bifurcation = 3, nev = 10, n_inversion = 6, tol_stability = 1e-3, plot_every_step = 2, max_steps = 130)
-br_SW = @time continuation((probSW), deepcopy(wave_sw.u), PALC(tangent = Bordered()), opt_cont_br;
-    eigsolver = BK.EigenWave(br.contparams.newton_options.eigsolver, false),
+opt_cont_br = ContinuationPar(p_min = -5.5,
+                                p_max = 1.5,
+                                newton_options = NewtonPar(optn, max_iterations = 5),
+                                ds= 0.001,
+                                dsmax = 0.05,
+                                detect_bifurcation = 3,
+                                nev = 10,
+                                n_inversion = 6,
+                                tol_stability = 1e-3,
+                                plot_every_step = 2,
+                                max_steps = 130)
+
+br_SW = @time continuation((probSW), 
+    deepcopy(wave_sw.u), 
+    AutoSwitch(PALC(tangent = Secant()), 0.3), 
+    opt_cont_br;
+    eigsolver = BK.GEigenWave(br.contparams.newton_options.eigsolver, false),
     record_from_solution = (x, p; k...) -> (max = maximum(x[1:end-probSW.nc]), nrm = norm(x[1:end-probSW.nc]), s = x[end], amp = amplitude(x[1:end-probSW.nc])),
+    linear_algo = MatrixBLS(),
     plot_solution = (ax, x, p; ax1, k...) -> begin
                     plotgridap!(ax, x[1:end-probSW.nc]; k...)
                     # BK.plot!(ax1, br)
     end,
     finalise_solution = (z, tau, step, contResult; k...) -> begin
-            N2(z.u[1:end-probSW.nc]) > 0.001
-            true
+            N2(z.u[1:end-probSW.nc]) > 0.02
+            # true
     end, 
     verbosity = 2,
     normC = norminf,
@@ -474,7 +480,7 @@ br_SW = @time continuation((probSW), deepcopy(wave_sw.u), PALC(tangent = Bordere
     )
 
 begin
-    f, ax = BK.plot(br_SW, br_TW, vars = (:param, :max))
+    f, ax = BK.plot(br_SW, br_TW, vars = (:param, :nrm))
     BK.plot!(ax, br)
     f
 end

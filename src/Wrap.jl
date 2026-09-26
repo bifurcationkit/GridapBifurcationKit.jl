@@ -271,7 +271,10 @@ function _residual_from_form(gp::GridapProblem, form, x, p)
 end
 
 # assemble an analytic parameter-derivative jacobian form `form(u, p, du, v)` and
-# apply it to `dx` (used for `R11` and for a weak-form `applyM`)
+# apply it to `dx` (used for `R11` and for a weak-form `applyM`). The direction
+# `dx` is frozen in the trial slot (with homogeneous Dirichlet data) and the
+# bilinear form is assembled directly into a free-dof vector, at the cost of a
+# residual assembly, instead of building the sparse matrix and multiplying it.
 _apply_from_biform(gp::GridapProblem, form, x, p, dx) = _apply_from_biform(gp.U, gp.V, form, x, p, dx)
 
 function _apply_from_biform(U, V, form, x, p, dx)

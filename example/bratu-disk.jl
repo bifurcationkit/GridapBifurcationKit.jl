@@ -71,12 +71,14 @@ buildDisk(N::Int, R, filename = "MyDisk.msh") = buildDisk(√(2*R*pi/N), R, file
 buildDisk(800, 1)
 ####################################################################################################
 using GridapGmsh
+begin
 model = GmshDiscreteModel("MyDisk.msh")
 const Ω = Triangulation(model)
 num_cells(Ω)
 GLMakie.plot(Ω)
 GLMakie.wireframe(Ω, color=:black, linewidth=2)
 GLMakie.scatter(Ω, marker=:star8, markersize=6, color=:blue)
+end
 #############################################
 # function spaces
 begin
@@ -112,8 +114,8 @@ prob = GridapBifProblem(res, uh, par_bratu, V, U, dΩ, (@optic _.λ);
                 plot_solution = (ax,x,p; k...) -> plotgridap!(ax, x;  k...),
                 record_from_solution = (x, p; k...) -> normbratu(x))
 end
-# factorize leads pivots issues, better use LU factorization here
-optn = NewtonPar(eigsolver = EigArpack())#EigKrylovKit(dim = 100))
+
+optn = NewtonPar(eigsolver = EigArnoldiMethod())
 sol = BifurcationKit.solve(prob, Newton(), NewtonPar(optn; verbose = true))
 
 opts = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6)
@@ -122,7 +124,7 @@ br = continuation(prob, PALC(tangent = Bordered()), opts;
     # verbosity = 1,
     )
 
-BifurcationKit.plot(br)
+BifurcationKit.plot(br)[1]
 
 nf = get_normal_form(br, 4; verbose = true, scaleζ = norminf, start_with_eigen = Val(false))
 ####################################################################################################

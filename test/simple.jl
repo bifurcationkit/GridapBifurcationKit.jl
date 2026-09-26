@@ -132,6 +132,9 @@ using BifurcationKit
             prob_amf = GridapBifProblem(res, uh, par, V, U, dΩ, (@optic _.λ);
                                         jac = jac, mass = mass_c, applyM = applyM_form)
             @test BifurcationKit.apply_mass_matrix(prob_amf, x, par, dx) ≈ c * M * dx
+            # complex direction (real / imaginary split)
+            dxc = dx .+ im .* reverse(dx)
+            @test BifurcationKit.apply_mass_matrix(prob_amf, x, par, dxc) ≈ c * M * dxc
         end
 
         @testset "mass derivatives (minimally augmented Hopf)" begin

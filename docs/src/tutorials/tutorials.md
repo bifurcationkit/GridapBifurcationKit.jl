@@ -28,3 +28,9 @@ Pages = ["brusselator.md"]
 Depth = 1
 ```
 
+## PDEs: travelling and standing waves
+
+```@contents
+Pages = ["cge.md"]
+Depth = 1
+```
