@@ -7,28 +7,28 @@ The tutorials are rated by the following scale of difficulty
 3. 🟠 high level of knowledge of (numerical) bifurcation theory (codim 2 bifurcations of periodic orbits, tweaking the methods)
 4. 🟤 very advanced tutorial, research level
 
-## PDEs: bifurcations of equilibria
+## bifurcations of equilibria
 
 ```@contents
 Pages = ["bratu.md"]
 Depth = 1
 ```
 
-## PDEs: unstructured meshes
+## unstructured meshes
 
 ```@contents
 Pages = ["bratu-disk.md"]
 Depth = 1
 ```
 
-## PDEs: equilibria, Hopf bifurcation and (bifurcations of) periodic orbits
+## equilibria, Hopf bifurcation and (bifurcations of) periodic orbits
 
 ```@contents
 Pages = ["brusselator.md"]
 Depth = 1
 ```
 
-## PDEs: travelling and standing waves
+## travelling and standing waves
 
 ```@contents
 Pages = ["cge.md"]
