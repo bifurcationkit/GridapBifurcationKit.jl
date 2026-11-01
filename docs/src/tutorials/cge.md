@@ -304,7 +304,7 @@ We freeze the travelling wave with a Newton solver, using the Hopf frequency `ω
 initial guess for the wave speed $-s$:
 
 ```@example CGE
-wave = BK.newton(probTW, vcat(u_ref, -ωH),
+wave = BK.newton(probTW, vcat(u_ref, ωH),
             BK.NewtonPar(max_iterations = 70, tol = 1e-9),
             normN = norminf)
 println("s = ", wave.u[end], ", ||u||₂ = ", N2(wave.u[1:end-probTW.nc]))

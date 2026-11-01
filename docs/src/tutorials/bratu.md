@@ -89,10 +89,7 @@ In the same vein, we can continue this solution as function of $\lambda$:
 ```@example BRATU
 optn = NewtonPar(eigsolver = EigArpack())
 optc = ContinuationPar(p_max = 40., p_min = 0.01, ds = 0.01, max_steps = 1000, detect_bifurcation = 3, newton_options = optn, nev = 20, tol_stability = 1e-6, n_inversion = 6)
-br = continuation(prob, PALC(tangent = Bordered()), optc;
-	# plot = true,
-	verbosity = 0,
-	)
+br = continuation(prob, PALC(tangent = Bordered()), optc)
 ```
 
 ```@example BRATU
@@ -117,7 +114,7 @@ br1 = continuation(br, 3,
 You can also plot the two branches together:
 
 ```@example BRATU
-f, ax = BK.plot(br,br1,plotfold=false; dash_unstable_style = true)
+f, ax = BK.plot(br, br1; plotfold=false, dash_unstable_style = true)
 f
 ```
 

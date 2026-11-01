@@ -104,7 +104,7 @@ fig = Figure()
 ax = Axis(fig[1, 1])
 plot!(ax, Ω)
 wireframe!(ax, Ω; color = :black, linewidth = 2)
-scatter!(ax, Ω; marker = :star8, markersize = 20, color = :blue)
+scatter!(ax, Ω; marker = :star8, markersize = 2, color = :blue)
 fig
 ```
 
