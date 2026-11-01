@@ -181,16 +181,15 @@ We then switch to the bifurcated branch:
 ```@example BRATUDISK
 br1 = continuation(br, 4,
         ContinuationPar(BK.getcontparams(br); ds = 0.001, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
-        verbosity = 0, nev = 10,
+        verbosity = 0,
         plot = true,
-        scaleζ = norminf,
-        start_with_eigen = Val(false),
+        normal_form_kwargs = (nev = 10, scaleζ = norminf, start_with_eigen = Val(false)),
         callback_newton = BK.cbMaxNorm(100))
 Makie.current_figure()
 ```
 
 ```@example BRATUDISK
-f, ax = BK.plot(br, br1...; dash_unstable_style = true)
+f, ax = BK.plot(br, br1; dash_unstable_style = true)
 f
 ```
 

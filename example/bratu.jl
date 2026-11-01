@@ -70,11 +70,11 @@ nf = get_normal_form(br, 2; verbose = true, scaleζ = norminf, start_with_eigen 
 ####################################################################################################
 br1 = continuation(br, 3,
         ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
-        verbosity = 0, plot = true, nev = 10,
+        verbosity = 0, plot = true,
+        normal_form_kwargs = (nev = 10, start_with_eigen = Val(false)),
         usedeflation = true,
         # scaleζ = norminf,
         autodiff = false,
-        start_with_eigen = Val(false),
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
@@ -82,10 +82,10 @@ BifurcationKit.plot(br, br1)[1]
 
 br2 = continuation(br1, 2,
         ContinuationPar(BifurcationKit.getcontparams(br);ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
-        verbosity = 0, plot = true, nev = 10,
+        verbosity = 0, plot = true,
+        normal_form_kwargs = (nev = 10, start_with_eigen = Val(false)),
         usedeflation = true,
         autodiff = false,
-        start_with_eigen = Val(false),
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
@@ -94,12 +94,12 @@ BifurcationKit.plot(br, br1, br2)[1]
 br3 = continuation(br, 2,
         ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
         verbosity = 0, plot = true,
+        normal_form_kwargs = (start_with_eigen = Val(false),),
         usedeflation = true,
-        verbosedeflation = false,
+        deflated_newton_kwargs = (verbosedeflation = false,),
         autodiff = false,
-        start_with_eigen = Val(false),
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
-BifurcationKit.plot(br, br1, br2, br3...)[1]
-BifurcationKit.plot(br, br3...)
+BifurcationKit.plot(br, br1, br2, br3)[1]
+BifurcationKit.plot(br, br3)

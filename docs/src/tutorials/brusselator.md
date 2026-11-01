@@ -177,7 +177,7 @@ probFD = BK.Trapeze(; M = 41,
         massmatrix = BK.getmassmatrix(prob, nothing, nothing))
 
 br_po = BK.continuation(br, 1, opts_po_cont, probFD;
-        start_with_eigen = Val(false),
+        normal_form_kwargs = (start_with_eigen = Val(false),),
         δp = 0.01,
         plot_solution = (ax, x, p; ax1, iter, state, k...) -> begin
             _sol = BK.get_periodic_orbit(BK.getprob(iter), x, p.p)

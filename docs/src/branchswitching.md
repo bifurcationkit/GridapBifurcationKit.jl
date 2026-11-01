@@ -14,20 +14,31 @@ Depth = 3
 You can perform automatic branch switching by calling `continuation` with the following options:
 
 ```julia
-continuation(br::ContResult, ind_bif::Int, optionsCont::ContinuationPar; kwargs...)
+continuation(br::ContResult, ind_bif::Int, optionsCont::ContinuationPar;
+             normal_form_kwargs = (), deflated_newton_kwargs = (), kwargs...)
 ```
 
 where `br` is a branch computed after a call to [`continuation`](@ref) with detection of bifurcation points enabled. This call computes the branch bifurcating from the `ind_bif`-th bifurcation point in `br`. An example of use is provided in the [1d Bratu model](@ref bratu) tutorial.
+
+The normal form computation is controlled by the `NamedTuple` `normal_form_kwargs` (for example
+`normal_form_kwargs = (nev = 10, scaleζ = norminf, start_with_eigen = Val(false))`), passed to
+[`get_normal_form`](@ref). The nonlinear deflation used to find the first point of the new
+branch is controlled by `deflated_newton_kwargs` (for example
+`deflated_newton_kwargs = (verbosedeflation = false,)`).
+
+The call returns a `Branch` (a `Branch` holding several branches for a non-simple branch
+point), which can be passed directly to `plot`, see [`Branch`](@ref).
 
 ## Branch switching from non-simple branch point to equilibria
 
 We provide an automatic branch switching method in this case. The method is to first compute the reduced equation (see [Simple bifurcation branch point](@ref simple-bp)) and use it to compute the nearby solutions. These solutions are seeded as initial guess for [`continuation`](@ref). Hence, you can perform automatic branch switching by calling `continuation` with the following options:
 
 ```julia
-continuation(br::ContResult, ind_bif::Int, optionsCont::ContinuationPar; kwargs...)
+continuation(br::ContResult, ind_bif::Int, optionsCont::ContinuationPar;
+             normal_form_kwargs = (), deflated_newton_kwargs = (), kwargs...)
 ```
 
-This requires the second and third derivatives of the residual (`d2res`, `d3res`) to be provided when building the [`GridapBifProblem`](@ref).
+This requires the second and third derivatives of the residual (`d2res`, `d3res`) to be provided when building the [`GridapBifProblem`](@ref). The result is a `Branch` holding the vector of bifurcated branches.
 
 ## Branch switching from Hopf point to periodic orbits
 
@@ -41,10 +52,12 @@ Once you have decided which method to use, you use the following call:
 ```julia
 continuation(br::ContResult, ind_HOPF::Int, _contParams::ContinuationPar,
 	prob::AbstractPeriodicOrbitProblem ;
-	δp = nothing, ampfactor = 1, kwargs...)
+	δp = nothing, ampfactor = 1, normal_form_kwargs = (), kwargs...)
 ```
 
-We refer to [`continuation`](@ref) for more information about the arguments.
+We refer to [`continuation`](@ref) for more information about the arguments. For a problem
+with a mass matrix, pass `normal_form_kwargs = (start_with_eigen = Val(false),)`, as the
+eigen-based kernel basis is not available for the generalized eigenproblem.
 
 !!! note "Mass matrix and periodic orbits"
     For a problem with a mass matrix (see [Mass matrix](@ref mass-matrix)), one builds the

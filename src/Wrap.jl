@@ -279,8 +279,17 @@ _apply_from_biform(gp::GridapProblem, form, x, p, dx) = _apply_from_biform(gp.U,
 
 function _apply_from_biform(U, V, form, x, p, dx)
     uh = FEFunction(U, x)
-    A  = Gridap.FESpaces.assemble_matrix((du, v) -> form(uh, p, du, v), U, V)
-    return A * dx
+    _apply(d) = begin
+        dh = _homogeneous_dual_fe(U, d)
+        op  = FEOperator((u, v) -> form(uh, p, dh, v), U, V)
+        algop = Gridap.FESpaces.get_algebraic_operator(op)
+        Gridap.FESpaces.residual(algop, x)
+    end
+    if eltype(dx) <: Real
+        return _apply(dx)
+    else
+        return _apply(real(dx)) .+ im .* _apply(imag(dx))
+    end
 end
 
 # ─── derivative flavours: analytic form, finite differences, ForwardDiff
@@ -587,7 +596,8 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
   [`get_mass_matrix`](@ref) and multiplied. It can also be:
   * a user closure `(x, p, dx) -> M(x, p) * dx`, used as is;
   * an **analytic** weak form `applyM(u, p, du, v)` (same signature as `jac`),
-    assembled with the same convention as `jac` and applied to `dx` on the fly.
+    assembled into a free-dof vector with `dx` frozen in the trial slot (same
+    cost as a residual assembly) instead of building the sparse matrix.
 - `R01`, `R02`, `R11`: parameter-derivative operators used for stability and
   normal-form computations. In addition to the `BK` sentinels
   (`BK.FiniteDifferences()`, `BK.AutoDiff()`, `nothing`) and to an already
@@ -595,8 +605,8 @@ eigenproblem ``dF(x,p)\\,\\phi = \\lambda\\, M(x,p)\\,\\phi`` (see the
   assembled with the same convention as `res`/`jac`:
   * `R01(u, p, v)`, `R02(u, p, v)`: residual-like forms, assembled into the free
     dof vector ``∂_p F`` (resp. ``∂^2_p F``);
-  * `R11(u, p, du, v)`: jacobian-like form, assembled into the matrix ``∂_p J``
-    and applied to the direction `du`.
+  * `R11(u, p, du, v)`: jacobian-like form, applied to the direction `du`
+    (i.e. ``∂_p J \\, du``, assembled as a vector without building the matrix).
   In these closures `p` is the **full parameter set** (`p.λ`, ...), *not* the
   scalar value of the continuation parameter.
 - `record_from_solution = BK.record_sol_default`, `plot_solution = BK.plot_default`:
@@ -716,7 +726,8 @@ function GridapBifProblem(res, u0, parms, V, U, dΩ, lens;
     # matrix and multiplies it. A user `applyM` is stored in the `applyM` field
     # of the `MassFunction` (see `BK.apply_mass_matrix`); it can be a closure
     # `(x, p, dx) -> M(x, p) * dx` (used as is) or an analytic weak form
-    # `applyM(u, p, du, v)` (assembled like `jac`).
+    # `applyM(u, p, du, v)` (assembled as a free-dof vector with `dx` frozen in
+    # the trial slot, see `_apply_from_biform`).
     my_applyM = if isnothing(applyM)
         (x, p, dx) -> _mass_matrix(mass_type, U, V, dΩ, mass, x, p) * dx
     elseif _is_jac_form(applyM)

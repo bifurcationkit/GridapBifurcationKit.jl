@@ -26,7 +26,7 @@ Pkg.add("https://github.com/bifurcationkit/GridapBifurcationKit.jl")
 - Support for **differential-algebraic problems** through a mass matrix: PDEs of the form
 
 ```math
-M\frac{\mathrm{d}z}{\mathrm{d}t} = F(z, p),
+M(z,p)\frac{\mathrm{d}z}{\mathrm{d}t} = F(z, p),
 ```
 
 with a possibly singular ``M`` (for example incompressible flows, where the pressure has no time derivative). This is essential to correctly compute the stability of the solution and to detect Hopf bifurcations.

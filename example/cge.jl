@@ -278,7 +278,7 @@ br_TW = @time continuation((probTW), deepcopy(wave.u), PALC(tangent = Bordered()
     verbosity = 1,
     normC = norminf,
     plot = true,
-    # bothside = true,
+    bothside = Val(true),
     )
 
 begin
@@ -312,7 +312,7 @@ br_MTW1 =  continuation(
     verbosity = 3,
 
     δp = 0.002, #ampfactor = 0.9,
-    start_with_eigen = Val(false),
+    normal_form_kwargs = (start_with_eigen = Val(false),),
     # use_normal_form = false, 
     
     # tangent predictor
@@ -369,7 +369,7 @@ br_MTW2 =  continuation(
     verbosity = 3,
 
     δp = 0.002, #ampfactor = 0.9,
-    start_with_eigen = Val(false),
+    normal_form_kwargs = (start_with_eigen = Val(false),),
     # use_normal_form = false, 
     
     # tangent predictor

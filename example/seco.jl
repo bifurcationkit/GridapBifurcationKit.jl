@@ -149,9 +149,8 @@ T22 = [continuation(br, ind,
                             dotθ = BifurcationKit.DotTheta(DOT)
 
                 ),
-                start_with_eigen = Val(false),
+                normal_form_kwargs = (start_with_eigen = Val(false), scaleζ = norminf),
                 # callbackN  = BK.cbMaxNormAndΔp(0.1, 0.01),
-                scaleζ = norminf,
                 verbosity = 2,
                 normC = norminf,
                 plot = true) for ind in 1:10 if br.specialpoint[ind].type==:bp]
@@ -166,9 +165,8 @@ T1 = continuation(br, 5,
                             # dotθ = BifurcationKit.DotTheta((x,y) -> dot(x,y)/length(y)/2),
                             dotθ = BifurcationKit.DotTheta(DOT)
                         ),
-                start_with_eigen = Val(false),
+                normal_form_kwargs = (start_with_eigen = Val(false), scaleζ = norminf),
                 callbackN  = BifurcationKit.cbMaxNormAndΔp(0.1, 0.01),
-                scaleζ = norminf,
                 verbosity = 2,
                 normC = norminf,
                 # bothside = true,
@@ -190,7 +188,7 @@ TSS = continuation(T1, 1,
                         ),
                 verbosity = 2,
                 normC = norminf,
-                start_with_eigen = Val(false),
+                normal_form_kwargs = (start_with_eigen = Val(false),),
                 callbackN  = BifurcationKit.cbMaxNormAndΔp(0.1, 0.01),
                 plot = true)
 
@@ -210,7 +208,7 @@ br_po = BK.continuation(TSS, 6, opts_po_cont, prob_po;
         alg = PALC(tangent = Bordered(), ),
         verbosity = 3,
         plot = true,
-        start_with_eigen = Val(false),
+        normal_form_kwargs = (start_with_eigen = Val(false),),
         δp = 0.01,
         plot_solution = (ax, x, p; ax1, iter, state, k...) -> begin
             _sol = BK.get_periodic_orbit(BK.getprob(iter), x, p.p)
@@ -269,7 +267,7 @@ br_po = BK.continuation(br, 1, opts_po_cont, prob_po;
     linear_algo = MatrixFreeBLS(ls_po, false),
     plot = true,
 
-    start_with_eigen = Val(false),
+    normal_form_kwargs = (start_with_eigen = Val(false),),
     δp = 0.01, ampfactor = 0.91,
 
     record_from_solution = record_po,

@@ -332,7 +332,7 @@ br_TW = BK.continuation(probTW, deepcopy(wave.u), BK.PALC(tangent = BK.Bordered(
     finalise_solution = (z, tau, step, contResult; k...) -> N2(z.u[1:end-probTW.nc]) > 0.01,
     verbosity = 0,
     normC = norminf,
-    bothside = true,
+    bothside = Val(true),
     plot = false)
 ```
 

@@ -127,16 +127,15 @@ bp = get_normal_form(br, 1; verbose = true, nev = 20, scaleζ = norminf, start_w
 br1 = @time continuation(br, 1, ContinuationPar(br.contparams; ds = 1e-2, max_steps = 100, detect_bifurcation = 3, dsmax = 0.02, dsmin = 1e-3, plot_every_step = 5, p_min = 2.2, n_inversion = 6);
         # verbosity = 3, 
         plot = true,
-        scaleζ = norminf,
-        start_with_eigen = Val(false),
+        normal_form_kwargs = (scaleζ = norminf, start_with_eigen = Val(false)),
         )
 
-BK.plot(br, br1...; dash_unstable_style = true, vars = (:param, :x))[1]
+BK.plot(br, br1; dash_unstable_style = true, vars = (:param, :x))[1]
 
 begin
 f,ax = BK.plot(br; vars = (:param, :max),label="")
 cols = Makie.wong_colors()
-for (i, b) in enumerate(br1)
+for (i, b) in enumerate(getbranches(br1))
     c = cols[mod1(i + 1, length(cols))]
     BK.plot!(ax, b; vars = (:param, :max), branchcolor = c, label="", )
     BK.plot!(ax, b; vars = (:param, :min), branchcolor = c, label="", )
@@ -148,7 +147,7 @@ xlims!(ax,(2.25,3.4))
 f
 end
 ####################################################################################################
-inds_br_hopf = [ii for ii in eachindex(br1) if any(sp -> sp.type == :hopf, br1[ii].specialpoint)]
+inds_br_hopf = [ii for ii in eachindex(getbranches(br1)) if any(sp -> sp.type == :hopf, br1[ii].specialpoint)]
 brh = br1[inds_br_hopf[1]]
 ind_h = findfirst(sp -> sp.type == :hopf, brh.specialpoint)
 
@@ -209,7 +208,7 @@ br_po = continuation(brh, ind_h,
             opts_po_cont,
             probFD
             ;
-            start_with_eigen = Val(false),
+            normal_form_kwargs = (start_with_eigen = Val(false),),
             δp = 0.01,
             ampfactor = 0.02,
             verbosity = 2,

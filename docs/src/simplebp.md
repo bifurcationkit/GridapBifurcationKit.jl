@@ -25,7 +25,8 @@ The reduced equation (E) can be automatically computed as follows
 
 ```julia
 get_normal_form(br::ContResult, ind_bif::Int ;
-	verbose = false, ζs = nothing, lens = br.param_lens)
+	verbose = false, lens = getlens(br), scaleζ = norm,
+	start_with_eigen = Val(true), detailed = Val(true))
 ```
 
 where `br` is a branch computed after a call to [`continuation`](@ref) with detection of

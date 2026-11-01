@@ -60,11 +60,15 @@ BifurcationKit.EigenMassMatrix
 Automatic branch switching at a branch point is performed with
 
 ```julia
-continuation(br::ContResult, ind_bif::Int, optionsCont::ContinuationPar; kwargs...)
+continuation(br::ContResult, ind_bif::Int, optionsCont::ContinuationPar;
+             normal_form_kwargs = (), deflated_newton_kwargs = (), kwargs...)
 ```
 
-where `br` is a branch computed with detection of bifurcation points enabled. See
-[Branch switching](@ref Branch-switching-page) for more information and the precise method
+where `br` is a branch computed with detection of bifurcation points enabled. The normal
+form options (`nev`, `scaleζ`, `start_with_eigen`, `detailed`, ...) are passed through the
+`NamedTuple` `normal_form_kwargs`; the deflated Newton options (`verbosedeflation`,
+`max_iter_deflation`, ...) through `deflated_newton_kwargs`. The call returns a `Branch`.
+See [Branch switching](@ref Branch-switching-page) for more information and the precise method
 definition in `BifurcationKit.jl`.
 
 ## Branch switching (Hopf point)
@@ -73,7 +77,8 @@ Automatic branch switching at a Hopf point towards periodic orbits is performed 
 
 ```julia
 continuation(br, ind_bif::Int, _contParams::ContinuationPar,
-	prob::AbstractPeriodicOrbitProblem ; δp = nothing, ampfactor = 1, kwargs...)
+	prob::AbstractPeriodicOrbitProblem ;
+	δp = nothing, ampfactor = 1, normal_form_kwargs = (), kwargs...)
 ```
 
 See [Branch switching](@ref Branch-switching-page) for more information and the precise

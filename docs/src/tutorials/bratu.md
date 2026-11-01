@@ -109,9 +109,7 @@ We can compute the branch off the third bifurcation point:
 br1 = continuation(br, 3,
         ContinuationPar(BK.getcontparams(br); ds = 0.005, dsmax = 0.05, max_steps = 140);
         # verbosity = 0, plot = true, 
-        nev = 10,
-        start_with_eigen = Val(false),
-        scaleζ = norminf,
+        normal_form_kwargs = (nev = 10, start_with_eigen = Val(false), scaleζ = norminf),
         callback_newton = BK.cbMaxNorm(10),
         )
 ```
@@ -129,9 +127,7 @@ We continue our journey and compute the branch bifurcating of the first bifurcat
 br2 = continuation(br1, 1,
         ContinuationPar(BK.getcontparams(br1);ds = 0.005, dsmax = 0.05, max_steps = 140);
         # verbosity = 0, plot = true, 
-        nev = 10,
-        start_with_eigen = Val(false),
-        scaleζ = norminf,
+        normal_form_kwargs = (nev = 10, start_with_eigen = Val(false), scaleζ = norminf),
         callback_newton = BK.cbMaxNorm(10),
         )
 f, ax = BK.plot(br, br1, br2; dash_unstable_style = true)
@@ -142,14 +138,14 @@ f
 
 We now show how to perform automatic branch switching at the nonsimple branch points. However, we think it is important that the user is able to use the previous tools in case automatic branch switching fails. This is explained in the next sections.
 
-The call for automatic branch switching is the same as in the case of simple branch points (see above) except that many branches are returned.
+The call for automatic branch switching is the same as in the case of simple branch points (see above) except that a `Branch` holding several branches is returned.
 
 ```@example BRATU
 branches = continuation(br, 2,
         # verbosity = 0, plot = true,
-        start_with_eigen = Val(false),
+        normal_form_kwargs = (start_with_eigen = Val(false),),
         usedeflation = true,
-        verbosedeflation = false,
+        deflated_newton_kwargs = (verbosedeflation = false,),
         callback_newton = BK.cbMaxNorm(10),
         )
 ```
@@ -157,7 +153,7 @@ branches = continuation(br, 2,
 You can plot the branches using
 
 ```@example BRATU
-f, ax = BK.plot(br1, br2, branches..., br; dash_unstable_style = true)
+f, ax = BK.plot(br1, br2, branches, br; dash_unstable_style = true)
 f
 ```
 

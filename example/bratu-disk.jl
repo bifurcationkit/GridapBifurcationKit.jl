@@ -15,7 +15,10 @@ function plotgridap!(ax, x::Vector; k...)
     plotgridap!(ax, uh; k...)
 end
 
-plotgridap!(ax, x; k...) = plot!(ax, Ω, x)
+function plotgridap!(ax, x; k...) 
+    plot!(ax, Ω, x)
+    GLMakie.wireframe!(ax, Ω, color=:black, linewidth=0.25)
+end
 
 ####################################################################################################
 function buildDisk(h::Float64, R, filename = "MyDisk.msh")
@@ -125,15 +128,14 @@ br = continuation(prob, PALC(tangent = Bordered()), opts;
     )
 
 BifurcationKit.plot(br)[1]
-
-nf = get_normal_form(br, 4; verbose = true, scaleζ = norminf, start_with_eigen = Val(false))
 ####################################################################################################
-br1 = continuation(br, 4,
-        ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.001, dsmax = 0.05, max_steps = 140, detect_bifurcation = 3);
-        verbosity = 1, plot = true, nev = 10,
-        # usedeflation = true,
-        scaleζ = norminf,
-        start_with_eigen = Val(false),
+nf = get_normal_form(br, 4; verbose = true, scaleζ = norminf, start_with_eigen = Val(false))
+br1 = continuation(br, 2,
+        ContinuationPar(BifurcationKit.getcontparams(br); ds = 0.001, dsmax = 0.5, max_steps = 200, detect_bifurcation = 3,plot_every_step = 20);
+        verbosity = 1, plot = true,
+        normal_form_kwargs = (nev = 10, scaleζ = norminf, start_with_eigen = Val(false)),
+        usedeflation = true,
+
         callback_newton = BifurcationKit.cbMaxNorm(100),
         )
 
@@ -149,7 +151,7 @@ diagram = @time bifurcationdiagram(prob, PALC(),
     # usedeflation = true,
     # finalise_solution = finSol,
     autodiff = false,
-    start_with_eigen = Val(false),
+    normal_form_kwargs = (start_with_eigen = Val(false),),
     verbosediagram = true,
     normC = norminf)
 
