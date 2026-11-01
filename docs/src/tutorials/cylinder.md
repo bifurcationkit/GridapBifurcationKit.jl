@@ -251,7 +251,7 @@ outpo = BK.newton(poTrap, orbitguess_f, optn_po;
     normN = NormL2T, callback = BK.cbMaxNorm(1))
 ```
 
-![](po-NS-1.png)
+![](po-NS.png)
 
 Finally, we continue the periodic orbit in the Mach number. The finalise callback refreshes the circulant preconditioner after each successful
 continuation step. The `record_po` callback stores the extrema of the drag coefficient along the orbit, so
