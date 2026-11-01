@@ -337,12 +337,9 @@ br_TW = BK.continuation(probTW, deepcopy(wave.u), BK.PALC(tangent = BK.Bordered(
 ```
 
 ```@example CGE
-try
-f, ax = BK.plot(br_TW, vars = (:param, :nrm))
-BK.plot!(ax, br)
+f, ax = BK.plot(br_TW; vars = (:param, :nrm), dash_unstable_style = true)
+BK.plot!(ax, br; dash_unstable_style = true)
 f
-catch
-end
 ```
 
 Here is an example of spiral wave:
@@ -409,7 +406,7 @@ br_SW = BK.continuation(probSW,
 Finally, we compare the trivial branch, the travelling waves and the standing waves:
 
 ```@example CGE
-f, ax = BK.plot(br_SW, br_TW, vars = (:param, :nrm), branchlabel = ["SW", "TW"])
-BK.plot!(ax, br)
+f, ax = BK.plot(br_SW, br_TW; vars = (:param, :nrm), branchlabel = ["SW", "TW"], dash_unstable_style = true)
+BK.plot!(ax, br; dash_unstable_style = true)
 f
 ```
