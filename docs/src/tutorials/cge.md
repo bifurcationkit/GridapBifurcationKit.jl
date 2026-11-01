@@ -337,9 +337,12 @@ br_TW = BK.continuation(probTW, deepcopy(wave.u), BK.PALC(tangent = BK.Bordered(
 ```
 
 ```@example CGE
+try
 f, ax = BK.plot(br_TW, vars = (:param, :nrm))
 BK.plot!(ax, br)
 f
+catch
+end
 ```
 
 Here is an example of spiral wave:
